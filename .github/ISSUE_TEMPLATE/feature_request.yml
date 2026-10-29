@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an enhancement or a new benchmark
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case or gap. What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like OmniBench to do?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New benchmark / platform coverage
+        - Scanner / check engine
+        - Dashboard / UI
+        - Remote scanning
+        - Reporting / export
+        - Packaging / deployment
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or other approaches you've thought about.

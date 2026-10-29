@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a problem with OmniBench
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do **not** include scan output that contains
+        real hostnames, usernames, IPs, or other sensitive data.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: When I scan X, the dashboard shows Y, but I expected Z.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `omnibench`
+        2. Load benchmark '...'
+        3. Click '...'
+        4. See error
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OmniBench version
+      description: Output of `omnibench --version`
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Docker
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / console output
+      description: Relevant server output or browser console errors. Redact sensitive values.
+      render: shell

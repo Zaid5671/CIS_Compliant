@@ -1,0 +1,29 @@
+[Unit]
+Description=OmniBench — Security Baseline Console
+Documentation=file:///opt/omnibench/README.md
+After=network.target
+
+[Service]
+Type=simple
+User=omnibench
+Group=omnibench
+WorkingDirectory=/var/lib/omnibench
+Environment=OMNIBENCH_CONFIG=/etc/omnibench/config.ini
+ExecStart=/opt/omnibench/.venv/bin/omnibench serve
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+ReadWritePaths=/var/lib/omnibench
+
+[Install]
+WantedBy=multi-user.target

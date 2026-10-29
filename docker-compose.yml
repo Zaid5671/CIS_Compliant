@@ -1,0 +1,17 @@
+services:
+  cisguard:
+    build: .
+    image: cisguard:latest
+    container_name: cisguard
+    restart: unless-stopped
+    # Bind to host loopback only; remove the 127.0.0.1 prefix only if you have
+    # additional network-layer access controls in front of the dashboard.
+    ports:
+      - "127.0.0.1:8507:8507"
+    volumes:
+      - cisguard-data:/data
+      # Optional: drop an omnibench.ini alongside docker-compose.yml and mount it.
+      # - ./omnibench.ini:/etc/omnibench/config.ini:ro
+
+volumes:
+  cisguard-data:
