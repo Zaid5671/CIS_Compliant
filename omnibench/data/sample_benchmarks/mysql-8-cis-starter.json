@@ -1,0 +1,127 @@
+{
+  "benchmark": {
+    "title": "MySQL 8.0 Starter",
+    "version": "0.1",
+    "platform": "mysql-8"
+  },
+  "checks": [
+    {
+      "id": "MYSQL-1.1",
+      "title": "MySQL major version is 8.0 or newer",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "mysql -N -B -e 'SELECT VERSION();' 2>/dev/null",
+      "expect": { "operator": "regex", "value": "^[89]\\." },
+      "rationale": "MySQL 5.7 reached EOL October 2023; only 8.0+ receives upstream security fixes.",
+      "remediation": "Upgrade to MySQL 8.0 LTS (or MySQL 8.4 LTS)."
+    },
+    {
+      "id": "MYSQL-2.1",
+      "title": "TLS is enabled for client connections",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "command",
+      "command": "mysql -N -B -e \"SHOW VARIABLES LIKE 'have_ssl';\" 2>/dev/null | awk '{print $2}'",
+      "expect": { "operator": "equals", "value": "YES" },
+      "rationale": "Without TLS, credentials and result sets traverse the network in cleartext.",
+      "remediation": "Configure ssl-cert, ssl-key, ssl-ca and restart mysqld."
+    },
+    {
+      "id": "MYSQL-2.2",
+      "title": "Default authentication plugin is caching_sha2_password",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Authentication",
+      "type": "command",
+      "command": "mysql -N -B -e \"SHOW VARIABLES LIKE 'default_authentication_plugin';\" 2>/dev/null | awk '{print $2}'",
+      "expect": { "operator": "equals", "value": "caching_sha2_password" },
+      "rationale": "caching_sha2_password supports channel binding and stronger hashing than legacy mysql_native_password.",
+      "remediation": "Set default_authentication_plugin=caching_sha2_password in my.cnf and rotate user passwords with ALTER USER ... IDENTIFIED WITH caching_sha2_password."
+    },
+    {
+      "id": "MYSQL-3.1",
+      "title": "local_infile is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "mysql -N -B -e \"SHOW VARIABLES LIKE 'local_infile';\" 2>/dev/null | awk '{print $2}'",
+      "expect": { "operator": "equals", "value": "OFF" },
+      "rationale": "local_infile=ON allows attackers who control a client to read arbitrary local files.",
+      "remediation": "Set local_infile=OFF in my.cnf."
+    },
+    {
+      "id": "MYSQL-3.2",
+      "title": "secure_file_priv is set to a fixed directory (not empty)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "mysql -N -B -e \"SHOW VARIABLES LIKE 'secure_file_priv';\" 2>/dev/null | awk '{print $2}'",
+      "expect": { "operator": "regex", "value": "^/.+" },
+      "rationale": "Empty secure_file_priv allows SELECT INTO OUTFILE / LOAD DATA INFILE anywhere on disk.",
+      "remediation": "Set secure_file_priv=/var/lib/mysql-files in my.cnf."
+    },
+    {
+      "id": "MYSQL-3.3",
+      "title": "skip_symbolic_links is enabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "mysql -N -B -e \"SHOW VARIABLES LIKE 'skip_symbolic_links';\" 2>/dev/null | awk '{print $2}'",
+      "expect": { "operator": "equals", "value": "ON" },
+      "rationale": "Symbolic links could be abused to escape the data directory.",
+      "remediation": "Add skip-symbolic-links to [mysqld] in my.cnf."
+    },
+    {
+      "id": "MYSQL-3.4",
+      "title": "General query log is OFF in production",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "mysql -N -B -e \"SHOW VARIABLES LIKE 'general_log';\" 2>/dev/null | awk '{print $2}'",
+      "expect": { "operator": "equals", "value": "OFF" },
+      "rationale": "general_log captures all statements including passwords; off in production.",
+      "remediation": "Set general_log=OFF in my.cnf."
+    },
+    {
+      "id": "MYSQL-4.1",
+      "title": "No accounts have an empty password",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Authentication",
+      "type": "command",
+      "command": "mysql -N -B -e \"SELECT COUNT(*) FROM mysql.user WHERE authentication_string='' AND plugin NOT IN ('auth_socket','mysql_no_login');\" 2>/dev/null",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "Any account with no password is a trivial breach vector.",
+      "remediation": "ALTER USER ... IDENTIFIED BY '<password>' for each, or DROP USER if unused."
+    },
+    {
+      "id": "MYSQL-5.1",
+      "title": "Manual: review users with global SUPER / SYSTEM_USER / SET_USER_ID privileges",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Privilege",
+      "type": "manual",
+      "audit": "Query 'SELECT * FROM information_schema.user_privileges WHERE privilege_type IN (\"SUPER\",\"SYSTEM_USER\",\"SET_USER_ID\");'. Confirm only DBA accounts hold these.",
+      "rationale": "Holders of SUPER-level privileges can bypass most security controls.",
+      "remediation": "REVOKE excess SUPER-level privileges; create scoped roles for application accounts."
+    },
+    {
+      "id": "MYSQL-5.2",
+      "title": "Manual: confirm backup encryption and retention policy",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Operations",
+      "type": "manual",
+      "audit": "Confirm mysqldump / mysqlpump / mysqlbackup output is encrypted (e.g., gpg or filesystem encryption) and stored per retention policy.",
+      "rationale": "Cleartext backups expose all data if storage is breached.",
+      "remediation": "Encrypt backups (gpg / native MySQL Enterprise Backup encryption) and verify restore drills."
+    }
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "benchmark": {
+    "title": "Windows Domain Controller Local CIS Read-Only Benchmark",
+    "version": "1.0",
+    "platform": "windows-domain-controller"
+  },
+  "checks": [
+    {
+      "id": "DC-1.1.1",
+      "title": "Ensure Enforce password history is 24 or more passwords",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Domain Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 password-history",
+      "expect": { "operator": "gte", "value": 24 },
+      "remediation": "Set domain password history to 24 or more passwords."
+    },
+    {
+      "id": "DC-1.1.2",
+      "title": "Ensure Minimum password length is 14 or more characters",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Domain Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 min-password-length",
+      "expect": { "operator": "gte", "value": 14 },
+      "remediation": "Set domain minimum password length to 14 or more characters."
+    },
+    {
+      "id": "DC-1.2.1",
+      "title": "Ensure Account lockout threshold is configured between 1 and 5 attempts",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Domain Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 lockout-threshold-compliant",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Set Account lockout threshold to 5 or fewer invalid attempts, but not 0."
+    },
+    {
+      "id": "DC-SVC-1",
+      "title": "Ensure Active Directory Domain Services service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Domain Controller Services",
+      "type": "service",
+      "service": "NTDS",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Confirm this host is an intended domain controller and ensure NTDS is healthy."
+    },
+    {
+      "id": "DC-SVC-2",
+      "title": "Ensure Kerberos Key Distribution Center service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Domain Controller Services",
+      "type": "service",
+      "service": "KDC",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start and investigate the Kerberos KDC service if this host is a domain controller."
+    },
+    {
+      "id": "DC-SVC-3",
+      "title": "Ensure Netlogon service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Domain Controller Services",
+      "type": "service",
+      "service": "Netlogon",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start and investigate Netlogon on intended domain controllers."
+    },
+    {
+      "id": "DC-SVC-4",
+      "title": "Ensure DNS Server service is running on DNS-backed domain controllers",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Domain Controller Services",
+      "type": "service",
+      "service": "DNS",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start DNS Server if this domain controller hosts AD-integrated DNS."
+    },
+    {
+      "id": "DC-9.1.1",
+      "title": "Ensure Windows Firewall Domain profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-domain",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Windows Defender Firewall for the Domain profile."
+    },
+    {
+      "id": "DC-18.4.3",
+      "title": "Ensure SMBv1 is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Network Services",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 smb1-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Disable or remove SMBv1."
+    },
+    {
+      "id": "DC-18.5.4.1",
+      "title": "Ensure Turn off multicast name resolution is enabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Network Configuration",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 llmnr-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable the policy Turn off multicast name resolution."
+    },
+    {
+      "id": "DC-18.9.45.1",
+      "title": "Ensure Microsoft Defender Antivirus service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Microsoft Defender Antivirus",
+      "type": "service",
+      "service": "WinDefend",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start Microsoft Defender Antivirus Service and investigate policy conflicts."
+    },
+    {
+      "id": "DC-18.9.64.1",
+      "title": "Ensure Windows Update service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Update",
+      "type": "service",
+      "service": "wuauserv",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start and enable the Windows Update service unless managed by an approved enterprise update tool."
+    }
+  ]
+}
+

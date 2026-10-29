@@ -1,0 +1,114 @@
+{
+  "benchmark": {
+    "title": "Proxmox VE Host Starter",
+    "version": "0.1",
+    "platform": "proxmox-ve"
+  },
+  "checks": [
+    {
+      "id": "PVE-1.1",
+      "title": "Proxmox VE version reported",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "pveversion 2>/dev/null | head -1",
+      "expect": { "operator": "regex", "value": "pve-manager/(\\d+\\.\\d+)" },
+      "rationale": "Track the Proxmox VE major.minor release for patch-status tracking.",
+      "remediation": "Confirm pveversion output matches an approved support track."
+    },
+    {
+      "id": "PVE-1.2",
+      "title": "All packages are up to date",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Patching",
+      "type": "command",
+      "command": "apt-get -s upgrade 2>/dev/null | awk '/^[0-9]+ upgraded/ {print $1; exit}'",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "Unpatched packages on the Proxmox host expose the hypervisor kernel and management stack.",
+      "remediation": "apt update && apt dist-upgrade (within an approved maintenance window)."
+    },
+    {
+      "id": "PVE-2.1",
+      "title": "SSH root login is restricted (no plain password)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Access",
+      "type": "command",
+      "command": "sshd -T 2>/dev/null | awk '/^permitrootlogin/ {print $2; exit}'",
+      "expect": { "operator": "regex", "value": "^(no|prohibit-password)$" },
+      "rationale": "Direct root password login on the hypervisor is a high-impact attack vector.",
+      "remediation": "Set 'PermitRootLogin prohibit-password' in /etc/ssh/sshd_config and reload sshd."
+    },
+    {
+      "id": "PVE-2.2",
+      "title": "Two-factor authentication is enabled for at least one PVE user",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Access",
+      "type": "manual",
+      "audit": "In the Proxmox UI: Datacenter > Permissions > Two Factor. Confirm at least one administrator has TOTP, U2F, or YubiKey configured.",
+      "rationale": "MFA on the management UI blocks credential-stuffing on exposed admin accounts.",
+      "remediation": "Configure TFA per-user in Datacenter > Permissions > Two Factor."
+    },
+    {
+      "id": "PVE-3.1",
+      "title": "Datacenter firewall is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Firewall",
+      "type": "command",
+      "command": "pvesh get /cluster/firewall/options --output-format yaml 2>/dev/null | awk -F: '/^enable:/ {print $2; exit}' | tr -d ' '",
+      "expect": { "operator": "equals", "value": 1 },
+      "rationale": "Datacenter-level firewall is the hypervisor's host-based packet filter.",
+      "remediation": "pvesh set /cluster/firewall/options --enable 1"
+    },
+    {
+      "id": "PVE-3.2",
+      "title": "Backup job exists (vzdump cron configured)",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Operations",
+      "type": "file_exists",
+      "path": "/etc/cron.d/vzdump",
+      "expect": { "operator": "is_true", "value": true },
+      "rationale": "A scheduled vzdump provides VM/container backup as a baseline DR control.",
+      "remediation": "Configure a backup job via UI: Datacenter > Backup."
+    },
+    {
+      "id": "PVE-3.3",
+      "title": "unattended-upgrades is enabled for security patches",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Patching",
+      "type": "command",
+      "command": "systemctl is-enabled unattended-upgrades.service 2>/dev/null",
+      "expect": { "operator": "equals", "value": "enabled" },
+      "rationale": "Automatic security upgrades close patch windows on the hypervisor host.",
+      "remediation": "apt install unattended-upgrades && systemctl enable --now unattended-upgrades."
+    },
+    {
+      "id": "PVE-4.1",
+      "title": "Manual: review storage backend encryption (ZFS native / LUKS)",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Storage",
+      "type": "manual",
+      "audit": "Identify storage pools backing VM images. For ZFS: 'zfs get encryption'. For LUKS: 'cryptsetup status <device>'. Confirm encryption-at-rest matches policy.",
+      "rationale": "VM disks at rest are a high-value target; encryption mitigates physical-disk theft.",
+      "remediation": "Migrate VM storage to encrypted ZFS datasets or LUKS-backed volumes."
+    },
+    {
+      "id": "PVE-4.2",
+      "title": "Manual: review cluster TLS certificate trust chain",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "manual",
+      "audit": "On each node, run 'pvecm status' and inspect /etc/pve/pve-root-ca.pem, /etc/pve/local/pveproxy-ssl.pem. Confirm the cluster CA and per-node certs are not self-signed defaults if exposing the UI externally.",
+      "rationale": "Replacing the self-signed defaults prevents trust prompts and enables certificate pinning by clients.",
+      "remediation": "Use 'pvenode acme cert order' (Let's Encrypt) or import an organization-issued cert."
+    }
+  ]
+}

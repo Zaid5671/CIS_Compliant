@@ -1,0 +1,127 @@
+{
+  "benchmark": {
+    "title": "Linux KVM / libvirt Host Starter",
+    "version": "0.1",
+    "platform": "linux-kvm"
+  },
+  "checks": [
+    {
+      "id": "KVM-1.1",
+      "title": "libvirtd service is active",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Role",
+      "type": "service",
+      "service": "libvirtd",
+      "expect": { "field": "status", "operator": "equals", "value": "active" },
+      "rationale": "libvirtd is the management API daemon for KVM.",
+      "remediation": "systemctl enable --now libvirtd"
+    },
+    {
+      "id": "KVM-1.2",
+      "title": "qemu-kvm package is installed",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "command -v qemu-system-x86_64 >/dev/null && echo present || echo missing",
+      "expect": { "operator": "equals", "value": "present" },
+      "rationale": "Inventory sanity check that the KVM userspace exists.",
+      "remediation": "apt install qemu-system-x86 (or distro equivalent)."
+    },
+    {
+      "id": "KVM-2.1",
+      "title": "virt-host-validate reports KVM accelerated virtualization is supported",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Host Capability",
+      "type": "command",
+      "command": "virt-host-validate qemu 2>/dev/null | awk -F: '/Checking for hardware virtualization/ {print $2; exit}' | xargs",
+      "expect": { "operator": "contains", "value": "PASS" },
+      "rationale": "Hardware virt extensions enable KVM acceleration; absent CPU support, VMs fall back to emulation.",
+      "remediation": "Enable VT-x/AMD-V in firmware; verify with 'egrep \"vmx|svm\" /proc/cpuinfo'."
+    },
+    {
+      "id": "KVM-2.2",
+      "title": "IOMMU is enabled at kernel level",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Host Capability",
+      "type": "file_contains",
+      "path": "/proc/cmdline",
+      "expect": { "operator": "regex", "value": "(intel|amd)_iommu=on" },
+      "rationale": "IOMMU isolates device DMA between guest VMs - required for safe PCI passthrough.",
+      "remediation": "Add 'intel_iommu=on' or 'amd_iommu=on' to GRUB_CMDLINE_LINUX, then update-grub and reboot."
+    },
+    {
+      "id": "KVM-3.1",
+      "title": "AppArmor (or SELinux) is enforcing for libvirt",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "MAC",
+      "type": "command",
+      "command": "aa-status 2>/dev/null | awk '/libvirt/ {found=1} END {print (found ? \"enforcing\" : \"unknown\")}'",
+      "expect": { "operator": "equals", "value": "enforcing" },
+      "rationale": "AppArmor/SELinux confines QEMU processes, limiting blast radius of a guest escape.",
+      "remediation": "Install apparmor + libvirt-daemon-system; ensure /etc/apparmor.d/abstractions/libvirt-qemu is enforced."
+    },
+    {
+      "id": "KVM-4.1",
+      "title": "Inventory total VMs (informational)",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "virsh list --all 2>/dev/null | awk 'NR>2 && NF>0 {n++} END {print n+0}'",
+      "expect": { "operator": "gte", "value": 0 },
+      "rationale": "Inventory baseline of all defined libvirt domains (running + stopped).",
+      "remediation": "Informational - no action required."
+    },
+    {
+      "id": "KVM-4.2",
+      "title": "No libvirt VMs running as the root user",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Privilege Separation",
+      "type": "command",
+      "command": "ps -eo user,comm 2>/dev/null | awk '$2==\"qemu-system-x86\" && $1==\"root\" {n++} END {print n+0}'",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "qemu-system processes should run as the unprivileged 'libvirt-qemu' / 'qemu' user to limit guest-escape impact.",
+      "remediation": "Configure /etc/libvirt/qemu.conf with user = \"libvirt-qemu\" and group = \"kvm\", then restart libvirtd."
+    },
+    {
+      "id": "KVM-5.1",
+      "title": "Default libvirt network is NAT (not bridged to physical LAN)",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Networking",
+      "type": "command",
+      "command": "virsh net-dumpxml default 2>/dev/null | awk -F'[<>]' '/<forward/ {for(i=1;i<=NF;i++) if($i~/mode=/) print $i}' | head -1",
+      "expect": { "operator": "regex", "value": "nat|route" },
+      "rationale": "A NAT default network prevents VM east-west exposure on the host's physical network.",
+      "remediation": "Edit the default network XML to use forward mode='nat' or 'route'."
+    },
+    {
+      "id": "KVM-6.1",
+      "title": "Manual: review SSH key-only authentication on the hypervisor",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Access",
+      "type": "manual",
+      "audit": "Inspect /etc/ssh/sshd_config for 'PasswordAuthentication no' and 'PubkeyAuthentication yes'. Confirm only approved keys are in authorized_keys for the management user.",
+      "rationale": "Disabling password auth on the KVM hypervisor blocks credential brute-force.",
+      "remediation": "Set 'PasswordAuthentication no' in sshd_config and reload sshd."
+    },
+    {
+      "id": "KVM-6.2",
+      "title": "Manual: review virsh secret storage for encrypted disks / Ceph keys",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Secrets",
+      "type": "manual",
+      "audit": "Run 'virsh secret-list'. Confirm encryption / Ceph / iSCSI secrets are present and recently rotated.",
+      "rationale": "Secrets used for storage encryption and remote pools must be managed and rotated.",
+      "remediation": "Rotate secrets per policy with 'virsh secret-set-value'."
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "benchmark": {
+    "title": "Windows Local CIS Starter Baseline",
+    "version": "0.1",
+    "platform": "windows"
+  },
+  "groups": [
+    {
+      "category": "Account Policy",
+      "checks": [
+        {
+          "id": "1.1.1",
+          "title": "Ensure password history is reported by local policy",
+          "severity": "medium",
+          "profile": "Level 1",
+          "type": "command",
+          "command": "net accounts",
+          "expect": {
+            "operator": "regex",
+            "value": "Length of password history maintained:\\s+\\d+"
+          },
+          "rationale": "Password history helps prevent users from cycling back to recently used passwords.",
+          "remediation": "Configure password history in Local Security Policy or through Group Policy.",
+          "audit": "Run net accounts and review the password history setting."
+        },
+        {
+          "id": "1.2.1",
+          "title": "Ensure account lockout threshold is present",
+          "severity": "high",
+          "profile": "Level 1",
+          "type": "command",
+          "command": "net accounts",
+          "expect": {
+            "operator": "regex",
+            "value": "Lockout threshold:\\s+(Never|\\d+)"
+          },
+          "rationale": "Account lockout policy reduces password guessing exposure.",
+          "remediation": "Configure Account Lockout Policy in Local Security Policy or Group Policy."
+        }
+      ]
+    },
+    {
+      "category": "Windows Defender",
+      "checks": [
+        {
+          "id": "18.9.45.1",
+          "title": "Ensure Microsoft Defender service is running",
+          "severity": "high",
+          "profile": "Level 1",
+          "type": "service",
+          "service": "WinDefend",
+          "expect": {
+            "field": "status",
+            "operator": "equals",
+            "value": "running"
+          },
+          "rationale": "Endpoint anti-malware protection should be active.",
+          "remediation": "Start Microsoft Defender Antivirus Service and investigate any policy disabling it."
+        },
+        {
+          "id": "18.9.45.2",
+          "title": "Ensure Defender real-time protection value can be queried",
+          "severity": "medium",
+          "profile": "Level 1",
+          "type": "command",
+          "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Get-Command Get-MpPreference -ErrorAction SilentlyContinue) { (Get-MpPreference).DisableRealtimeMonitoring } else { 'Unavailable' }\"",
+          "expect": {
+            "operator": "equals",
+            "value": "False"
+          },
+          "rationale": "Real-time protection provides continuous malware monitoring.",
+          "remediation": "Enable Microsoft Defender real-time protection."
+        }
+      ]
+    },
+    {
+      "category": "System Policy",
+      "checks": [
+        {
+          "id": "2.3.17.1",
+          "title": "Ensure User Account Control is enabled",
+          "severity": "high",
+          "profile": "Level 1",
+          "type": "registry",
+          "registry_path": "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
+          "value_name": "EnableLUA",
+          "expect": {
+            "operator": "equals",
+            "value": 1
+          },
+          "rationale": "UAC helps prevent unauthorized elevation.",
+          "remediation": "Set EnableLUA to 1 and reboot if required."
+        },
+        {
+          "id": "2.3.99.1",
+          "title": "Review local administrator group membership",
+          "severity": "medium",
+          "profile": "Level 1",
+          "type": "manual",
+          "audit": "Review members of the local Administrators group and confirm every account is approved.",
+          "rationale": "Excess local administrator membership increases privilege escalation risk.",
+          "remediation": "Remove unauthorized members from the local Administrators group."
+        }
+      ]
+    }
+  ]
+}
+

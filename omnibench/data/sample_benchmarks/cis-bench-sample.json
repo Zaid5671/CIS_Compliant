@@ -1,0 +1,76 @@
+{
+  "title": "CIS Microsoft Windows 11 Enterprise Benchmark",
+  "benchmark_id": "example-24000",
+  "url": "https://workbench.cisecurity.org/benchmarks/example-24000",
+  "version": "3.0.0",
+  "downloaded_at": "2026-05-25T09:00:00Z",
+  "scraper_version": "v1_current",
+  "total_recommendations": 2,
+  "recommendations": [
+    {
+      "ref": "1.1.1",
+      "title": "Ensure 'Enforce password history' is set to '24 or more password(s)'",
+      "url": "https://workbench.cisecurity.org/benchmarks/example-24000/recommendations/1.1.1",
+      "assessment_status": "Automated",
+      "profiles": ["Level 1 - Domain Controller", "Level 1 - Member Server"],
+      "cis_controls": [
+        {
+          "version": 8,
+          "control": "5.2",
+          "title": "Use Unique Passwords",
+          "ig1": true,
+          "ig2": true,
+          "ig3": true
+        }
+      ],
+      "mitre_mapping": {
+        "techniques": ["T1110"],
+        "tactics": ["TA0006"],
+        "mitigations": ["M1027"]
+      },
+      "nist_controls": ["IA-5"],
+      "parent": {
+        "url": "https://workbench.cisecurity.org/benchmarks/example-24000/sections/1.1",
+        "title": "Account Policies"
+      },
+      "artifacts": [
+        {
+          "id": 1001,
+          "view_level": "1.1.1",
+          "title": "Password history policy artifact",
+          "status": "active",
+          "artifact_type": {"type": "policy"}
+        }
+      ],
+      "description": "<p>This policy setting determines the number of unique new passwords that must be associated with a user account before an old password can be reused.</p>",
+      "rationale": "<p>The longer a user uses the same password, the greater the chance that an attacker can determine the password through brute force attacks.</p>",
+      "audit": "<p>Navigate to <code>Computer Configuration\\Windows Settings\\Security Settings\\Account Policies\\Password Policy</code> and verify the value.</p>",
+      "remediation": "<p>Set <strong>Enforce password history</strong> to <code>24 or more password(s)</code>.</p>",
+      "references": "<p>Microsoft password policy guidance.</p>"
+    },
+    {
+      "ref": "18.10.43.6.1",
+      "title": "Ensure 'Turn on Script Scanning' is set to 'Enabled'",
+      "url": "https://workbench.cisecurity.org/benchmarks/example-24000/recommendations/18.10.43.6.1",
+      "assessment_status": "Manual",
+      "profiles": ["Level 1 - Member Server"],
+      "cis_controls": [],
+      "mitre_mapping": {
+        "techniques": [],
+        "tactics": [],
+        "mitigations": []
+      },
+      "nist_controls": ["SI-3"],
+      "parent": {
+        "url": "https://workbench.cisecurity.org/benchmarks/example-24000/sections/18.10",
+        "title": "Microsoft Defender Antivirus"
+      },
+      "artifacts": [],
+      "description": "<p>This setting controls script scanning in Microsoft Defender Antivirus.</p>",
+      "rationale": "<p>Script scanning helps detect malicious script activity.</p>",
+      "audit": "<p>Review Microsoft Defender Antivirus policy settings and confirm script scanning is enabled.</p>",
+      "remediation": "<p>Enable the policy setting in Group Policy.</p>"
+    }
+  ]
+}
+

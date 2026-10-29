@@ -1,0 +1,127 @@
+{
+  "benchmark": {
+    "title": "PostgreSQL 15+ Starter",
+    "version": "0.1",
+    "platform": "postgresql"
+  },
+  "checks": [
+    {
+      "id": "PG-1.1",
+      "title": "PostgreSQL version is supported (>= 13)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW server_version_num;' 2>/dev/null",
+      "expect": { "operator": "gte", "value": 130000 },
+      "rationale": "Out-of-support PostgreSQL releases no longer receive security patches.",
+      "remediation": "Upgrade to a vendor-supported major release; track https://www.postgresql.org/support/versioning/."
+    },
+    {
+      "id": "PG-2.1",
+      "title": "SSL is enabled on the cluster",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW ssl;' 2>/dev/null",
+      "expect": { "operator": "equals", "value": "on" },
+      "rationale": "Encrypted in-transit connections prevent credential and data interception.",
+      "remediation": "Set ssl = on in postgresql.conf; provide server.crt and server.key."
+    },
+    {
+      "id": "PG-2.2",
+      "title": "Password encryption uses scram-sha-256",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Authentication",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW password_encryption;' 2>/dev/null",
+      "expect": { "operator": "equals", "value": "scram-sha-256" },
+      "rationale": "MD5 hashes are reversible; scram-sha-256 is the modern channel-binding default.",
+      "remediation": "Set password_encryption = 'scram-sha-256' and rotate user passwords."
+    },
+    {
+      "id": "PG-2.3",
+      "title": "Connections are logged",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Auditing",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW log_connections;' 2>/dev/null",
+      "expect": { "operator": "equals", "value": "on" },
+      "rationale": "Connection logs support forensic investigation and authentication monitoring.",
+      "remediation": "Set log_connections = on; restart or pg_reload_conf()."
+    },
+    {
+      "id": "PG-2.4",
+      "title": "Disconnections are logged",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Auditing",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW log_disconnections;' 2>/dev/null",
+      "expect": { "operator": "equals", "value": "on" },
+      "rationale": "Pair with log_connections to track session lifetimes.",
+      "remediation": "Set log_disconnections = on."
+    },
+    {
+      "id": "PG-2.5",
+      "title": "Data-modifying statements are logged",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Auditing",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW log_statement;' 2>/dev/null",
+      "expect": { "operator": "regex", "value": "^(mod|ddl|all)$" },
+      "rationale": "Logging mod statements captures the audit trail for INSERT/UPDATE/DELETE/DDL.",
+      "remediation": "Set log_statement = 'mod' (or 'all' for full statement audit)."
+    },
+    {
+      "id": "PG-3.1",
+      "title": "listen_addresses is not '*' (limit network exposure)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Network",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW listen_addresses;' 2>/dev/null",
+      "expect": { "operator": "not_equals", "value": "*" },
+      "rationale": "Binding to '*' exposes Postgres to every network interface including potentially untrusted ones.",
+      "remediation": "Set listen_addresses to specific interface IPs."
+    },
+    {
+      "id": "PG-3.2",
+      "title": "pgaudit extension is preloaded",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Auditing",
+      "type": "command",
+      "command": "psql -tA -c 'SHOW shared_preload_libraries;' 2>/dev/null",
+      "expect": { "operator": "contains", "value": "pgaudit" },
+      "rationale": "pgaudit produces detailed session and object-level audit logging required for compliance.",
+      "remediation": "Install pgaudit; set shared_preload_libraries = 'pgaudit' and restart."
+    },
+    {
+      "id": "PG-4.1",
+      "title": "Manual: review pg_hba.conf for trust authentication entries",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Authentication",
+      "type": "manual",
+      "audit": "Inspect pg_hba.conf for any 'trust' lines. Confirm trust is only used on loopback for the postgres superuser (or removed entirely).",
+      "rationale": "'trust' authentication accepts any connection without password verification.",
+      "remediation": "Replace 'trust' with scram-sha-256 or peer (Unix socket only)."
+    },
+    {
+      "id": "PG-4.2",
+      "title": "Manual: review database role privileges and per-role password expiry",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Authentication",
+      "type": "manual",
+      "audit": "Query 'SELECT rolname, rolsuper, rolvaliduntil FROM pg_roles WHERE rolcanlogin;'. Confirm superusers are limited and password expiry is set for application roles.",
+      "rationale": "Per-role least-privilege limits blast radius of credential compromise.",
+      "remediation": "ALTER ROLE <name> VALID UNTIL '<date>'; REVOKE SUPERUSER FROM application roles."
+    }
+  ]
+}

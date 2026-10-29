@@ -1,0 +1,120 @@
+{
+  "benchmark": {
+    "title": "Windows Hyper-V Host Local CIS Read-Only Benchmark",
+    "version": "1.0",
+    "platform": "windows-hyper-v"
+  },
+  "checks": [
+    {
+      "id": "HV-ROLE-1",
+      "title": "Ensure Hyper-V feature is enabled on intended Hyper-V hosts",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Hyper-V Role",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"try { (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State } catch { 'Unavailable' }\"",
+      "expect": { "operator": "equals", "value": "Enabled" },
+      "remediation": "Install and enable Hyper-V only on approved virtualization hosts."
+    },
+    {
+      "id": "HV-SVC-1",
+      "title": "Ensure Hyper-V Virtual Machine Management service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Hyper-V Services",
+      "type": "service",
+      "service": "vmms",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start and investigate the Hyper-V Virtual Machine Management service on intended Hyper-V hosts."
+    },
+    {
+      "id": "HV-SVC-2",
+      "title": "Ensure Hyper-V Host Compute service is running when present",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Hyper-V Services",
+      "type": "service",
+      "service": "vmcompute",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start the Host Compute service if this host uses Hyper-V isolation or containers."
+    },
+    {
+      "id": "HV-9.1.1",
+      "title": "Ensure Windows Firewall Domain profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-domain",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Windows Defender Firewall for the Domain profile."
+    },
+    {
+      "id": "HV-9.2.1",
+      "title": "Ensure Windows Firewall Private profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-private",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Windows Defender Firewall for the Private profile."
+    },
+    {
+      "id": "HV-9.3.1",
+      "title": "Ensure Windows Firewall Public profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-public",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Windows Defender Firewall for the Public profile."
+    },
+    {
+      "id": "HV-18.9.45.1",
+      "title": "Ensure Microsoft Defender real-time protection is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Microsoft Defender Antivirus",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 defender-realtime",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Microsoft Defender real-time protection."
+    },
+    {
+      "id": "HV-18.4.3",
+      "title": "Ensure SMBv1 is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Network Services",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 smb1-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Disable or remove SMBv1."
+    },
+    {
+      "id": "HV-18.9.64.1",
+      "title": "Ensure Windows Update service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Update",
+      "type": "service",
+      "service": "wuauserv",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start and enable the Windows Update service unless managed by an approved enterprise update tool."
+    },
+    {
+      "id": "HV-18.9.13.1",
+      "title": "Ensure AutoAdminLogon is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logon Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 auto-admin-logon-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Disable AutoAdminLogon and remove stored automatic logon credentials."
+    }
+  ]
+}
+

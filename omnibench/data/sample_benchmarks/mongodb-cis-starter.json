@@ -1,0 +1,125 @@
+{
+  "benchmark": {
+    "title": "MongoDB 6+ Starter",
+    "version": "0.1",
+    "platform": "mongodb"
+  },
+  "checks": [
+    {
+      "id": "MONGO-1.1",
+      "title": "MongoDB version reported (>= 5.0)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "mongosh --quiet --eval 'db.version()' 2>/dev/null | tail -1",
+      "expect": { "operator": "regex", "value": "^([5-9]|[1-9][0-9])\\." },
+      "rationale": "Pre-5.0 releases no longer receive security patches from MongoDB Inc.",
+      "remediation": "Plan an in-place upgrade to MongoDB 6.0 LTS or 7.0."
+    },
+    {
+      "id": "MONGO-2.1",
+      "title": "Access control (authorization) is enabled",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Authentication",
+      "type": "command",
+      "command": "mongosh --quiet --eval 'JSON.stringify(db.adminCommand({ getCmdLineOpts: 1 }))' 2>/dev/null | grep -oE '\"authorization\":\"enabled\"' | head -1",
+      "expect": { "operator": "equals", "value": "\"authorization\":\"enabled\"" },
+      "rationale": "Without auth, anyone reaching the mongod port has full database access.",
+      "remediation": "Set security.authorization: enabled in mongod.conf, create root user, and restart mongod."
+    },
+    {
+      "id": "MONGO-2.2",
+      "title": "TLS is required for client connections",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "command",
+      "command": "mongosh --quiet --eval 'JSON.stringify(db.adminCommand({ getCmdLineOpts: 1 }).parsed)' 2>/dev/null | grep -oE '\"mode\":\"requireTLS\"' | head -1",
+      "expect": { "operator": "equals", "value": "\"mode\":\"requireTLS\"" },
+      "rationale": "Without TLS, credentials and BSON payloads traverse the network in cleartext.",
+      "remediation": "Set net.tls.mode: requireTLS and provide certificateKeyFile in mongod.conf."
+    },
+    {
+      "id": "MONGO-3.1",
+      "title": "Server-side JavaScript execution is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "mongosh --quiet --eval 'JSON.stringify(db.adminCommand({ getCmdLineOpts: 1 }).parsed)' 2>/dev/null | grep -oE '\"javascriptEnabled\":(true|false)' | awk -F: '{print $2}' | head -1",
+      "expect": { "operator": "equals", "value": "false" },
+      "rationale": "Server-side JavaScript ($where, mapReduce) is a known RCE pivot in injection scenarios.",
+      "remediation": "Set security.javascriptEnabled: false in mongod.conf."
+    },
+    {
+      "id": "MONGO-3.2",
+      "title": "mongod does not bind to 0.0.0.0 / wildcard interface",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Network",
+      "type": "command",
+      "command": "mongosh --quiet --eval 'JSON.stringify(db.adminCommand({ getCmdLineOpts: 1 }).parsed.net.bindIp)' 2>/dev/null",
+      "expect": { "operator": "not_contains", "value": "0.0.0.0" },
+      "rationale": "Binding to 0.0.0.0 exposes mongod to every reachable network interface.",
+      "remediation": "Set net.bindIp to specific interface IPs (or 127.0.0.1 for single-host)."
+    },
+    {
+      "id": "MONGO-4.1",
+      "title": "Auditing is configured (auditLog destination present)",
+      "severity": "high",
+      "profile": "Level 2",
+      "category": "Auditing",
+      "type": "command",
+      "command": "mongosh --quiet --eval 'JSON.stringify(db.adminCommand({ getCmdLineOpts: 1 }).parsed.auditLog)' 2>/dev/null",
+      "expect": { "operator": "regex", "value": "destination" },
+      "rationale": "Audit logs are required for change tracking and forensic investigation.",
+      "remediation": "Configure auditLog.destination=file (or syslog) in mongod.conf - Enterprise feature."
+    },
+    {
+      "id": "MONGO-5.1",
+      "title": "Manual: review user roles for least-privilege",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Privilege",
+      "type": "manual",
+      "audit": "Run 'db.getUsers()' on admin and each tenant database. Confirm app users have scoped roles (e.g., readWrite on one DB) rather than root or dbAdminAnyDatabase.",
+      "rationale": "Overprivileged users widen blast radius of credential compromise.",
+      "remediation": "Recreate users with role-scoped privileges using db.createUser({...roles: [{role:'readWrite', db:'appdb'}]})."
+    },
+    {
+      "id": "MONGO-5.2",
+      "title": "Manual: confirm replica set / sharded cluster requires keyFile or x.509 auth",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Cluster Auth",
+      "type": "manual",
+      "audit": "Inspect security.keyFile or security.clusterAuthMode in each member's mongod.conf. Confirm internal authentication is enforced for all replica-set/sharded members.",
+      "rationale": "Without keyFile/x.509, any host reaching the replication port can join the set.",
+      "remediation": "Generate a shared keyFile (chmod 400) and reference it in security.keyFile on every member."
+    },
+    {
+      "id": "MONGO-5.3",
+      "title": "Manual: verify Encryption at Rest (WiredTiger encryption or filesystem LUKS)",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Encryption at Rest",
+      "type": "manual",
+      "audit": "Check security.enableEncryption (Enterprise) or confirm the data volume backing dbPath is LUKS / native cloud-disk encryption.",
+      "rationale": "Cleartext data files expose all collections if storage is breached.",
+      "remediation": "Enable WiredTiger encryption with KMIP/Vault key management, or migrate to encrypted disks."
+    },
+    {
+      "id": "MONGO-5.4",
+      "title": "Manual: backup encryption and retention policy",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Operations",
+      "type": "manual",
+      "audit": "Confirm mongodump / Ops Manager / Cloud backup output is encrypted at rest and retained per policy.",
+      "rationale": "Unencrypted backups defeat at-rest encryption protections.",
+      "remediation": "Use encrypted backup destinations and validate restore drills."
+    }
+  ]
+}

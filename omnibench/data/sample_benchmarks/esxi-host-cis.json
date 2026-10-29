@@ -1,0 +1,127 @@
+{
+  "benchmark": {
+    "title": "VMware ESXi Host Starter",
+    "version": "0.1",
+    "platform": "vmware-esxi"
+  },
+  "checks": [
+    {
+      "id": "ESXI-1.1",
+      "title": "ESXi version is on a vendor-supported release",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "vmware -v 2>/dev/null || echo unknown",
+      "expect": { "operator": "regex", "value": "VMware ESXi\\s+([7-9]|[1-9][0-9])" },
+      "rationale": "End-of-life ESXi builds no longer receive security patches.",
+      "remediation": "Upgrade ESXi to a currently supported major.minor release per VMware's lifecycle policy."
+    },
+    {
+      "id": "ESXI-2.1",
+      "title": "SSH daemon is disabled in steady state",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Access",
+      "type": "command",
+      "command": "vim-cmd hostsvc/services/status TSM-SSH 2>/dev/null | head -1",
+      "expect": { "operator": "regex", "value": "Stopped|false" },
+      "rationale": "Persistent SSH on ESXi is a top-tier attack surface; enable only during maintenance.",
+      "remediation": "vim-cmd hostsvc/stop_service TSM-SSH && chkconfig SSH off"
+    },
+    {
+      "id": "ESXI-2.2",
+      "title": "ESXi Shell (TSM) is disabled in steady state",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Access",
+      "type": "command",
+      "command": "vim-cmd hostsvc/services/status TSM 2>/dev/null | head -1",
+      "expect": { "operator": "regex", "value": "Stopped|false" },
+      "rationale": "The ESXi Shell exposes direct command access; production hosts should disable it.",
+      "remediation": "vim-cmd hostsvc/stop_service TSM && chkconfig TSM off"
+    },
+    {
+      "id": "ESXI-2.3",
+      "title": "Lockdown Mode is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Access",
+      "type": "command",
+      "command": "esxcli system settings advanced list -o /Net/EnableLockdownMode 2>/dev/null | awk '/Int Value:/ {print $3; exit}'",
+      "expect": { "operator": "regex", "value": "^[1-9][0-9]*$" },
+      "rationale": "Lockdown mode forces management through vCenter, reducing direct-host abuse.",
+      "remediation": "Configure lockdown mode (Normal or Strict) via vCenter > Host > Configure > Security Profile."
+    },
+    {
+      "id": "ESXI-3.1",
+      "title": "Strict UEFI Secure Boot is enabled",
+      "severity": "high",
+      "profile": "Level 2",
+      "category": "Host Integrity",
+      "type": "command",
+      "command": "esxcli system settings encryption get 2>/dev/null | awk '/Require Secure Boot:/ {print $4; exit}'",
+      "expect": { "operator": "regex", "value": "true|TRUE|1" },
+      "rationale": "Secure Boot blocks unsigned VIBs from loading in the boot chain.",
+      "remediation": "Enable UEFI Secure Boot in firmware and 'esxcli system settings encryption set --require-secure-boot=TRUE'."
+    },
+    {
+      "id": "ESXI-3.2",
+      "title": "NTP service has at least one server configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Time",
+      "type": "command",
+      "command": "esxcli system ntp get 2>/dev/null | awk -F: '/Servers/ {print $2}' | tr -d ' '",
+      "expect": { "operator": "regex", "value": ".+" },
+      "rationale": "Accurate time is required for log correlation, certificates, and Kerberos.",
+      "remediation": "esxcli system ntp set --server=<your-ntp-server>"
+    },
+    {
+      "id": "ESXI-4.1",
+      "title": "Welcome / login banner is configured",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Compliance",
+      "type": "command",
+      "command": "esxcli system settings advanced list -o /Annotations/WelcomeMessage 2>/dev/null | awk '/String Value:/ {sub(/^[ \\t]*String Value:[ \\t]*/, \"\"); print; exit}'",
+      "expect": { "operator": "regex", "value": ".+" },
+      "rationale": "Pre-login banners provide legal notice and aid incident response.",
+      "remediation": "esxcli system settings advanced set -o /Annotations/WelcomeMessage -s \"<your banner>\""
+    },
+    {
+      "id": "ESXI-4.2",
+      "title": "SuppressShellWarning is OFF (warnings should be visible)",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Compliance",
+      "type": "command",
+      "command": "esxcli system settings advanced list -o /UserVars/SuppressShellWarning 2>/dev/null | awk '/Int Value:/ {print $3; exit}'",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "Suppressing shell warnings hides indicators that management services are active.",
+      "remediation": "esxcli system settings advanced set -o /UserVars/SuppressShellWarning -i 0"
+    },
+    {
+      "id": "ESXI-5.1",
+      "title": "Manual: review esxcli network firewall ruleset list",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Firewall",
+      "type": "manual",
+      "audit": "Run 'esxcli network firewall ruleset list' over SSH. Confirm only required rulesets are Enabled. Common targets: vSphereClient, sshServer, dhcpv6, snmp.",
+      "rationale": "Each enabled ruleset opens a port set on the ESXi management interface.",
+      "remediation": "Disable unused rulesets: 'esxcli network firewall ruleset set --enabled=false --ruleset-id=<id>'."
+    },
+    {
+      "id": "ESXI-5.2",
+      "title": "Manual: vCenter is the only management plane (no rogue ESX Admins)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Access",
+      "type": "manual",
+      "audit": "From vCenter, review Host > Permissions. Confirm no unexpected AD groups have Administrator role on the ESXi host directly.",
+      "rationale": "Domain joins prior to ESXi 7.0 created an implicit 'ESX Admins' AD group that granted host admin; this is a known privilege-escalation vector.",
+      "remediation": "Remove 'ESX Admins' AD group from host permissions; manage via vCenter SSO roles instead."
+    }
+  ]
+}

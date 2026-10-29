@@ -1,0 +1,128 @@
+{
+  "benchmark": {
+    "title": "Cisco IOS / IOS XE Starter",
+    "version": "0.1",
+    "platform": "cisco-ios"
+  },
+  "checks": [
+    {
+      "id": "CISCO-1.1",
+      "title": "Device version reported (inventory)",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "show version | include IOS",
+      "expect": { "operator": "regex", "value": "Cisco IOS" },
+      "rationale": "Identify the IOS/IOS XE train for vulnerability triage.",
+      "remediation": "Compare 'show version' against Cisco PSIRT advisories for the running train."
+    },
+    {
+      "id": "CISCO-2.1",
+      "title": "SSH version 2 only",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "command",
+      "command": "show running-config | include ^ip ssh version",
+      "expect": { "operator": "contains", "value": "ip ssh version 2" },
+      "rationale": "SSHv1 is broken; only v2 is acceptable.",
+      "remediation": "conf t ; ip ssh version 2 ; end."
+    },
+    {
+      "id": "CISCO-2.2",
+      "title": "HTTP server is disabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "command",
+      "command": "show running-config | include ^ip http server",
+      "expect": { "operator": "regex", "value": "no ip http server|^$" },
+      "rationale": "The cleartext HTTP management server should be off; use HTTPS or SSH.",
+      "remediation": "conf t ; no ip http server ; end."
+    },
+    {
+      "id": "CISCO-2.3",
+      "title": "Service password-encryption is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Credentials",
+      "type": "command",
+      "command": "show running-config | include ^service password-encryption",
+      "expect": { "operator": "contains", "value": "service password-encryption" },
+      "rationale": "Type-7 passwords are weak but better than cleartext in running-config.",
+      "remediation": "conf t ; service password-encryption ; end."
+    },
+    {
+      "id": "CISCO-2.4",
+      "title": "Enable secret (not enable password) is configured",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Credentials",
+      "type": "command",
+      "command": "show running-config | include ^enable",
+      "expect": { "operator": "regex", "value": "enable secret\\s+(8|9|5)" },
+      "rationale": "Type 8 (PBKDF2) or type 9 (scrypt) are the secure options; legacy type-7 is reversible.",
+      "remediation": "conf t ; enable algorithm-type scrypt secret <password> ; end."
+    },
+    {
+      "id": "CISCO-3.1",
+      "title": "VTY lines restricted to SSH transport",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "VTY",
+      "type": "command",
+      "command": "show running-config | section line vty",
+      "expect": { "operator": "regex", "value": "transport input ssh" },
+      "rationale": "telnet must be off on management lines.",
+      "remediation": "conf t ; line vty 0 15 ; transport input ssh ; end."
+    },
+    {
+      "id": "CISCO-3.2",
+      "title": "VTY access-class applied to limit management source IPs",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "VTY",
+      "type": "command",
+      "command": "show running-config | section line vty",
+      "expect": { "operator": "regex", "value": "access-class\\s+\\S+\\s+in" },
+      "rationale": "Source-IP allowlist on VTY lines contains exposure during credential leaks.",
+      "remediation": "conf t ; ip access-list standard MGMT ; permit <subnet> ; line vty 0 15 ; access-class MGMT in ; end."
+    },
+    {
+      "id": "CISCO-4.1",
+      "title": "Logging buffered at notification level (5) or higher",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Logging",
+      "type": "command",
+      "command": "show running-config | include ^logging buffered",
+      "expect": { "operator": "regex", "value": "logging buffered" },
+      "rationale": "On-device buffered logs aid first-pass incident triage.",
+      "remediation": "conf t ; logging buffered 32000 notifications ; end."
+    },
+    {
+      "id": "CISCO-4.2",
+      "title": "NTP authentication / trusted-key configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Time",
+      "type": "command",
+      "command": "show running-config | include ^ntp",
+      "expect": { "operator": "regex", "value": "ntp authentication-key" },
+      "rationale": "Authenticated NTP prevents spoofed time updates affecting cert/Kerberos validity.",
+      "remediation": "conf t ; ntp authenticate ; ntp authentication-key 1 sha256 <key> ; ntp trusted-key 1 ; ntp server <ip> key 1 ; end."
+    },
+    {
+      "id": "CISCO-5.1",
+      "title": "Manual: SNMP communities are not default and use v3 with authPriv",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "manual",
+      "audit": "Run 'show running-config | include snmp-server'. Confirm no 'public' / 'private' communities and that v3 users are configured with auth + priv (sha + aes).",
+      "rationale": "Default SNMP communities allow information disclosure and config changes.",
+      "remediation": "Remove community strings; configure 'snmp-server group ... v3 priv' with sha+aes."
+    }
+  ]
+}

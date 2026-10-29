@@ -1,0 +1,140 @@
+{
+  "benchmark": {
+    "title": "Debian 12 Bookworm Starter",
+    "version": "0.1",
+    "platform": "debian-12"
+  },
+  "checks": [
+    {
+      "id": "DEB-1.1",
+      "title": "AppArmor is enforcing",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "MAC",
+      "type": "command",
+      "command": "aa-status --enabled 2>/dev/null && echo enabled || echo disabled",
+      "expect": { "operator": "equals", "value": "enabled" },
+      "rationale": "AppArmor confines services to defined profiles, limiting blast radius of compromise.",
+      "remediation": "apt install apparmor apparmor-utils; systemctl enable --now apparmor."
+    },
+    {
+      "id": "DEB-1.2",
+      "title": "nftables service is active",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Firewall",
+      "type": "service",
+      "service": "nftables",
+      "expect": { "field": "status", "operator": "equals", "value": "active" },
+      "rationale": "nftables is Debian 12's default packet filter framework.",
+      "remediation": "systemctl enable --now nftables; configure /etc/nftables.conf."
+    },
+    {
+      "id": "DEB-1.3",
+      "title": "systemd-timesyncd or chrony is active",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Time",
+      "type": "command",
+      "command": "systemctl is-active systemd-timesyncd 2>/dev/null || systemctl is-active chrony 2>/dev/null || echo inactive",
+      "expect": { "operator": "equals", "value": "active" },
+      "rationale": "Accurate time supports log correlation and certificate validity.",
+      "remediation": "systemctl enable --now systemd-timesyncd (or chrony)."
+    },
+    {
+      "id": "DEB-1.4",
+      "title": "auditd service is active",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Auditing",
+      "type": "service",
+      "service": "auditd",
+      "expect": { "field": "status", "operator": "equals", "value": "active" },
+      "rationale": "auditd captures kernel/syscall events for forensic analysis.",
+      "remediation": "apt install auditd; systemctl enable --now auditd."
+    },
+    {
+      "id": "DEB-2.1",
+      "title": "Root SSH login is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "SSH Server",
+      "type": "command",
+      "command": "sshd -T 2>/dev/null | awk '/^permitrootlogin/ {print $2; exit}'",
+      "expect": { "operator": "regex", "value": "^(no|prohibit-password)$" },
+      "rationale": "Direct root SSH login is a top-tier attack vector.",
+      "remediation": "Set 'PermitRootLogin no' in /etc/ssh/sshd_config."
+    },
+    {
+      "id": "DEB-2.2",
+      "title": "SSH password authentication is disabled",
+      "severity": "high",
+      "profile": "Level 2",
+      "category": "SSH Server",
+      "type": "command",
+      "command": "sshd -T 2>/dev/null | awk '/^passwordauthentication/ {print $2; exit}'",
+      "expect": { "operator": "equals", "value": "no" },
+      "rationale": "Key-only SSH blocks credential brute force.",
+      "remediation": "Set 'PasswordAuthentication no' in /etc/ssh/sshd_config."
+    },
+    {
+      "id": "DEB-3.1",
+      "title": "unattended-upgrades service is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Patching",
+      "type": "command",
+      "command": "systemctl is-enabled unattended-upgrades.service 2>/dev/null",
+      "expect": { "operator": "equals", "value": "enabled" },
+      "rationale": "Auto-applied security updates close patch windows.",
+      "remediation": "apt install unattended-upgrades; dpkg-reconfigure -plow unattended-upgrades."
+    },
+    {
+      "id": "DEB-3.2",
+      "title": "AIDE intrusion-detection package is installed",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Integrity",
+      "type": "command",
+      "command": "dpkg -l aide 2>/dev/null | awk '/^ii.*aide/ {print \"installed\"; exit}'",
+      "expect": { "operator": "equals", "value": "installed" },
+      "rationale": "AIDE tracks file-integrity baselines.",
+      "remediation": "apt install aide && aideinit."
+    },
+    {
+      "id": "DEB-4.1",
+      "title": "/etc/shadow has no empty password fields",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Account Policy",
+      "type": "file_contains",
+      "path": "/etc/shadow",
+      "expect": { "operator": "not_regex", "value": "^[^:]+::" },
+      "rationale": "Accounts with empty passwords allow unauthenticated login.",
+      "remediation": "passwd -l <user> to lock accounts with empty passwords."
+    },
+    {
+      "id": "DEB-4.2",
+      "title": "Login banner /etc/issue.net is configured",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Compliance",
+      "type": "file_exists",
+      "path": "/etc/issue.net",
+      "expect": { "operator": "is_true", "value": true },
+      "rationale": "Pre-login banner provides legal notice and incident-response context.",
+      "remediation": "Populate /etc/issue.net with the organization's authorized-use banner."
+    },
+    {
+      "id": "DEB-5.1",
+      "title": "Manual: verify /tmp and /var/log are separate filesystems with hardened mount options",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Filesystem",
+      "type": "manual",
+      "audit": "Run 'findmnt /tmp /var/log /var/log/audit /dev/shm' and confirm each is a separate mount with nodev,nosuid,noexec where applicable.",
+      "rationale": "Separate partitions enforce per-mount options and prevent /var fill from blocking the OS.",
+      "remediation": "Repartition during install or add systemd mount overrides."
+    }
+  ]
+}

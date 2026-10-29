@@ -1,0 +1,131 @@
+{
+  "benchmark": {
+    "title": "Windows Server Core Local CIS Read-Only Benchmark",
+    "version": "1.0",
+    "platform": "windows-server-core"
+  },
+  "checks": [
+    {
+      "id": "CORE-1.1.1",
+      "title": "Ensure Enforce password history is 24 or more passwords",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 password-history",
+      "expect": { "operator": "gte", "value": 24 },
+      "remediation": "Set Enforce password history to 24 or more passwords."
+    },
+    {
+      "id": "CORE-1.1.2",
+      "title": "Ensure Minimum password length is 14 or more characters",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 min-password-length",
+      "expect": { "operator": "gte", "value": 14 },
+      "remediation": "Set Minimum password length to 14 or more characters."
+    },
+    {
+      "id": "CORE-1.2.1",
+      "title": "Ensure Account lockout threshold is configured between 1 and 5 attempts",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Account Lockout Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 lockout-threshold-compliant",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Set Account lockout threshold to 5 or fewer invalid attempts, but not 0."
+    },
+    {
+      "id": "CORE-9.1.1",
+      "title": "Ensure Windows Firewall Domain profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-domain",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Windows Defender Firewall for the Domain profile."
+    },
+    {
+      "id": "CORE-9.2.1",
+      "title": "Ensure Windows Firewall Private profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-private",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Windows Defender Firewall for the Private profile."
+    },
+    {
+      "id": "CORE-9.3.1",
+      "title": "Ensure Windows Firewall Public profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-public",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable Windows Defender Firewall for the Public profile."
+    },
+    {
+      "id": "CORE-18.4.3",
+      "title": "Ensure SMBv1 is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Network Services",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 smb1-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Disable or remove SMBv1."
+    },
+    {
+      "id": "CORE-18.5.4.1",
+      "title": "Ensure Turn off multicast name resolution is enabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Network Configuration",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 llmnr-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Enable the policy Turn off multicast name resolution."
+    },
+    {
+      "id": "CORE-18.9.45.1",
+      "title": "Ensure Microsoft Defender Antivirus service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Microsoft Defender Antivirus",
+      "type": "service",
+      "service": "WinDefend",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start Microsoft Defender Antivirus Service and investigate policy conflicts."
+    },
+    {
+      "id": "CORE-18.9.64.1",
+      "title": "Ensure Windows Update service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Update",
+      "type": "service",
+      "service": "wuauserv",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "remediation": "Start and enable the Windows Update service unless managed by an approved enterprise update tool."
+    },
+    {
+      "id": "CORE-18.9.13.1",
+      "title": "Ensure AutoAdminLogon is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logon Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 auto-admin-logon-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "remediation": "Disable AutoAdminLogon and remove stored automatic logon credentials."
+    }
+  ]
+}
+

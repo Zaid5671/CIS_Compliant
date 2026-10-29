@@ -1,0 +1,40 @@
+{
+  "benchmark": {
+    "title": "Linux Local CIS Starter Baseline",
+    "version": "0.1",
+    "platform": "linux"
+  },
+  "checks": [
+    {
+      "id": "1.1.1",
+      "title": "Ensure /tmp exists",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Filesystem",
+      "type": "file_exists",
+      "path": "/tmp",
+      "expect": {
+        "operator": "is_true",
+        "value": true
+      },
+      "rationale": "The temporary directory is required for many local checks.",
+      "remediation": "Create /tmp with appropriate permissions."
+    },
+    {
+      "id": "5.2.1",
+      "title": "Ensure SSH configuration disables empty passwords",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "SSH",
+      "type": "command",
+      "command": "sshd -T 2>/dev/null | grep -i '^permitemptypasswords'",
+      "expect": {
+        "operator": "contains",
+        "value": "permitemptypasswords no"
+      },
+      "rationale": "SSH accounts should not allow empty passwords.",
+      "remediation": "Set PermitEmptyPasswords no in sshd_config and reload sshd."
+    }
+  ]
+}
+

@@ -1,0 +1,120 @@
+{
+  "benchmark": {
+    "title": "Azure Foundations CIS Starter",
+    "version": "0.1",
+    "platform": "azure"
+  },
+  "checks": [
+    {
+      "id": "AZ-1.1",
+      "title": "Manual: review Entra ID Global Administrators count (small + named)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Identity",
+      "type": "manual",
+      "audit": "az role assignment list --role 'Global Administrator' --all -o table. Confirm Global Admin count is small (typically <= 5), all named individuals, no service principals.",
+      "rationale": "Global Administrators are the highest-privilege identity in the tenant.",
+      "remediation": "Re-assign privileges via PIM-eligible role activation; remove standing Global Admin rights."
+    },
+    {
+      "id": "AZ-1.2",
+      "title": "Manual: Entra ID MFA enforced for all admins (Conditional Access)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Identity",
+      "type": "manual",
+      "audit": "Entra ID > Conditional Access > Policies. Confirm a CA policy targets all admin roles and requires MFA, with no exclusions other than break-glass accounts.",
+      "rationale": "Admin MFA is the single most important Entra ID control.",
+      "remediation": "Create a CA policy: Users=All admins, Cloud apps=All, Grant=Require MFA."
+    },
+    {
+      "id": "AZ-1.3",
+      "title": "Manual: legacy auth blocked via Conditional Access",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Identity",
+      "type": "manual",
+      "audit": "Entra ID > Conditional Access. Confirm a CA policy blocks 'Other clients' / legacy authentication for all users.",
+      "rationale": "Legacy auth (POP, IMAP, SMTP AUTH) bypasses MFA.",
+      "remediation": "Create a CA policy blocking legacy authentication for all users."
+    },
+    {
+      "id": "AZ-2.1",
+      "title": "Subscription has Microsoft Defender for Cloud Standard enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Defender for Cloud",
+      "type": "command",
+      "command": "az security pricing list --query \"value[?pricingTier=='Standard'] | length(@)\" -o tsv 2>/dev/null",
+      "expect": { "operator": "gte", "value": 1 },
+      "rationale": "Defender Standard provides agent-based threat protection across plans.",
+      "remediation": "az security pricing create --name VirtualMachines --tier Standard (repeat per relevant plan)."
+    },
+    {
+      "id": "AZ-2.2",
+      "title": "Manual: Storage Accounts deny public blob access by default",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Storage",
+      "type": "manual",
+      "audit": "az storage account list --query '[].{name:name,allowBlobPublicAccess:allowBlobPublicAccess}' -o table. Confirm allowBlobPublicAccess=false for all accounts.",
+      "rationale": "Public blob containers have leaked sensitive data across many published incidents.",
+      "remediation": "az storage account update --name <name> --resource-group <rg> --allow-blob-public-access false."
+    },
+    {
+      "id": "AZ-2.3",
+      "title": "Manual: SQL servers / SQL Managed Instances enforce TLS 1.2 minimum",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "SQL",
+      "type": "manual",
+      "audit": "az sql server list --query '[].{name:name,minimalTlsVersion:minimalTlsVersion}' -o table. Confirm minimalTlsVersion='1.2'.",
+      "rationale": "TLS 1.0/1.1 are deprecated and PCI-DSS non-compliant.",
+      "remediation": "az sql server update --name <server> --resource-group <rg> --minimal-tls-version 1.2."
+    },
+    {
+      "id": "AZ-3.1",
+      "title": "Manual: Network Security Group default rules audited (no 0.0.0.0/0 to admin ports)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Networking",
+      "type": "manual",
+      "audit": "az network nsg list --query '[].securityRules[?direction==`Inbound` && (destinationPortRange==`3389` || destinationPortRange==`22`) && sourceAddressPrefix==`*`].id' -o tsv. Should be empty.",
+      "rationale": "RDP/SSH exposed to the internet is a top initial-access vector.",
+      "remediation": "Replace 0.0.0.0/0 SourceAddressPrefix with specific IPs or Just-In-Time access via Defender for Cloud."
+    },
+    {
+      "id": "AZ-4.1",
+      "title": "Manual: Key Vault soft-delete and purge protection enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Key Vault",
+      "type": "manual",
+      "audit": "az keyvault list --query '[].{name:name,softDelete:properties.enableSoftDelete,purgeProtection:properties.enablePurgeProtection}' -o table. Confirm both true.",
+      "rationale": "Soft-delete + purge protection prevent accidental/malicious key destruction.",
+      "remediation": "az keyvault update --name <vault> --enable-soft-delete true --enable-purge-protection true."
+    },
+    {
+      "id": "AZ-5.1",
+      "title": "Manual: Activity Log retention + diagnostic settings configured to Log Analytics",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Logging",
+      "type": "manual",
+      "audit": "az monitor diagnostic-settings subscription list -o table. Confirm at least one setting forwards Activity Log to Log Analytics (or Storage with retention).",
+      "rationale": "Without retention + central logging, breach forensics are impossible.",
+      "remediation": "az monitor diagnostic-settings subscription create with --workspace pointing at your Sentinel/LA workspace."
+    },
+    {
+      "id": "AZ-5.2",
+      "title": "Manual: Microsoft Sentinel or equivalent SIEM is consuming Activity / Sign-in / Audit logs",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Logging",
+      "type": "manual",
+      "audit": "In Sentinel, confirm data connectors for 'Azure Activity' and 'Microsoft Entra ID' are Connected.",
+      "rationale": "SIEM correlation enables detection of identity attacks and lateral movement.",
+      "remediation": "Enable the Azure Activity and Entra ID connectors in Sentinel."
+    }
+  ]
+}

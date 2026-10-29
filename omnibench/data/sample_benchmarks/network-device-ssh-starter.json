@@ -1,0 +1,42 @@
+{
+  "benchmark": {
+    "title": "Network Device SSH Starter",
+    "version": "0.1",
+    "platform": "network"
+  },
+  "checks": [
+    {
+      "id": "1.1",
+      "title": "Manual: verify a pre-login banner / MOTD is configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Banner",
+      "type": "manual",
+      "audit": "Run 'show running-config | include banner' and confirm a banner is present.",
+      "rationale": "Pre-login banners can support legal notice and incident response.",
+      "remediation": "Configure 'banner motd' on the device."
+    },
+    {
+      "id": "1.2",
+      "title": "Manual: confirm device firmware is on a supported release",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "manual",
+      "audit": "Run 'show version' and verify the train is supported by the vendor.",
+      "rationale": "End-of-life firmware does not receive security patches.",
+      "remediation": "Plan firmware upgrade per the vendor advisory."
+    },
+    {
+      "id": "2.1",
+      "title": "Manual: ensure SNMP communities are not default",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "manual",
+      "audit": "Inspect SNMP configuration for community strings such as 'public' or 'private'.",
+      "rationale": "Default communities allow trivial information disclosure.",
+      "remediation": "Replace SNMP communities with strong, unique values; prefer SNMPv3 with auth+priv."
+    }
+  ]
+}

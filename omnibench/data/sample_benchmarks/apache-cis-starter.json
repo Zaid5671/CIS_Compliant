@@ -1,0 +1,127 @@
+{
+  "benchmark": {
+    "title": "Apache httpd Web Server Starter",
+    "version": "0.1",
+    "platform": "apache-httpd"
+  },
+  "checks": [
+    {
+      "id": "APACHE-1.1",
+      "title": "Apache version is reported (inventory)",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Inventory",
+      "type": "command",
+      "command": "apachectl -v 2>/dev/null || httpd -v 2>/dev/null | head -1",
+      "expect": { "operator": "regex", "value": "Apache/2\\.4" },
+      "rationale": "Track major.minor version against your support policy.",
+      "remediation": "Stay on 2.4.x current; consider EOL of 2.2 if still in use."
+    },
+    {
+      "id": "APACHE-2.1",
+      "title": "ServerTokens is set to Prod (minimal version disclosure)",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Information Disclosure",
+      "type": "command",
+      "command": "(apachectl -DDUMP_VHOSTS 2>&1; grep -hE '^[[:space:]]*ServerTokens' /etc/apache2/*.conf /etc/httpd/conf*/*.conf 2>/dev/null) | awk '/^[[:space:]]*ServerTokens/ {print tolower($2); exit}'",
+      "expect": { "operator": "equals", "value": "prod" },
+      "rationale": "Full server tokens disclose OS and module version, aiding attacker fingerprinting.",
+      "remediation": "Set 'ServerTokens Prod' in the main config."
+    },
+    {
+      "id": "APACHE-2.2",
+      "title": "ServerSignature is Off",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Information Disclosure",
+      "type": "command",
+      "command": "grep -hE '^[[:space:]]*ServerSignature' /etc/apache2/*.conf /etc/httpd/conf*/*.conf 2>/dev/null | awk '/^[[:space:]]*ServerSignature/ {print tolower($2); exit}'",
+      "expect": { "operator": "equals", "value": "off" },
+      "rationale": "Server signature on error pages discloses Apache version.",
+      "remediation": "Set 'ServerSignature Off' in the main config."
+    },
+    {
+      "id": "APACHE-2.3",
+      "title": "TraceEnable is Off",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "grep -hE '^[[:space:]]*TraceEnable' /etc/apache2/*.conf /etc/httpd/conf*/*.conf 2>/dev/null | awk '/^[[:space:]]*TraceEnable/ {print tolower($2); exit}'",
+      "expect": { "operator": "equals", "value": "off" },
+      "rationale": "TRACE/TRACK requests can be abused for XST and cookie disclosure.",
+      "remediation": "Set 'TraceEnable Off' globally."
+    },
+    {
+      "id": "APACHE-3.1",
+      "title": "SSL protocols exclude TLS 1.0/1.1 and SSL 2/3",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "command",
+      "command": "grep -rhE '^[[:space:]]*SSLProtocol' /etc/apache2 /etc/httpd 2>/dev/null | head -1",
+      "expect": { "operator": "not_regex", "value": "(SSLv|TLSv1\\.0|TLSv1\\.1)" },
+      "rationale": "Legacy TLS/SSL protocols are deprecated and broken.",
+      "remediation": "Set 'SSLProtocol -all +TLSv1.2 +TLSv1.3'."
+    },
+    {
+      "id": "APACHE-4.1",
+      "title": "Directory listings are disabled (Options -Indexes)",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "grep -rhE 'Options[[:space:]]+.*Indexes' /etc/apache2 /etc/httpd 2>/dev/null | grep -v '^\\s*#' | grep -v '\\-Indexes' | head -1",
+      "expect": { "operator": "equals", "value": "" },
+      "rationale": "Open directory listings disclose application file layout.",
+      "remediation": "Use 'Options -Indexes' in <Directory> blocks (or remove the Indexes token)."
+    },
+    {
+      "id": "APACHE-4.2",
+      "title": "AllowOverride None is set on the document root",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "manual",
+      "audit": "Inspect <Directory '/var/www/html'> blocks (or your DocumentRoot). Confirm 'AllowOverride None' to prevent .htaccess overriding the central policy.",
+      "rationale": ".htaccess can override security directives if AllowOverride is permissive.",
+      "remediation": "Set 'AllowOverride None' in the DocumentRoot's <Directory> block and reload."
+    },
+    {
+      "id": "APACHE-5.1",
+      "title": "X-Frame-Options header configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Headers",
+      "type": "command",
+      "command": "grep -rhE 'Header[[:space:]]+(always[[:space:]]+)?set[[:space:]]+X-Frame-Options' /etc/apache2 /etc/httpd 2>/dev/null | head -1",
+      "expect": { "operator": "contains", "value": "X-Frame-Options" },
+      "rationale": "Blocks clickjacking via iframe embedding.",
+      "remediation": "Add 'Header always set X-Frame-Options DENY' to the main config."
+    },
+    {
+      "id": "APACHE-5.2",
+      "title": "Strict-Transport-Security (HSTS) header configured",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Headers",
+      "type": "command",
+      "command": "grep -rhE 'Header[[:space:]]+(always[[:space:]]+)?set[[:space:]]+Strict-Transport-Security' /etc/apache2 /etc/httpd 2>/dev/null | head -1",
+      "expect": { "operator": "contains", "value": "Strict-Transport-Security" },
+      "rationale": "HSTS forces browsers to use HTTPS only, preventing protocol downgrade.",
+      "remediation": "Add 'Header always set Strict-Transport-Security \"max-age=63072000; includeSubDomains\"'."
+    },
+    {
+      "id": "APACHE-6.1",
+      "title": "Manual: confirm mod_security (WAF) or ModSecurity-CRS is enabled",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "WAF",
+      "type": "manual",
+      "audit": "Run 'apachectl -M' and confirm 'security2_module' is enabled. Inspect modsecurity.conf for OWASP CRS inclusion.",
+      "rationale": "A baseline WAF blocks generic injection / scanner traffic.",
+      "remediation": "Install libapache2-mod-security2 (or mod_security_crs), then enable + tune the OWASP Core Rule Set."
+    }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "benchmark": {
+    "title": "Hyper-V Local Role Audit",
+    "version": "0.1",
+    "platform": "windows-hyperv"
+  },
+  "checks": [
+    {
+      "id": "HV-1.1",
+      "title": "Hyper-V role is installed and management cmdlets are available",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Role",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" module-available",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "All subsequent Hyper-V checks depend on the role being installed.",
+      "remediation": "Install Hyper-V via Windows Features or 'Install-WindowsFeature Hyper-V'."
+    },
+    {
+      "id": "HV-2.1",
+      "title": "Virtualization Based Security (VBS) is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Host Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" vbs-enabled",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "VBS is the foundation for Credential Guard and HVCI on the Hyper-V host.",
+      "remediation": "Enable VBS via Group Policy or Device Guard configuration; ensure UEFI and TPM 2.0 are available."
+    },
+    {
+      "id": "HV-2.2",
+      "title": "Hypervisor-protected Code Integrity (HVCI) is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Host Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" hvci-running",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "HVCI enforces kernel code-signing using virtualization to reduce kernel-mode malware exposure.",
+      "remediation": "Enable Memory Integrity in Windows Security or via the Device Guard policy."
+    },
+    {
+      "id": "HV-2.3",
+      "title": "Credential Guard is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Host Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" credential-guard-running",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "Credential Guard isolates LSA secrets in a VBS-protected enclave.",
+      "remediation": "Enable Credential Guard via Group Policy: Computer Configuration > Admin Templates > System > Device Guard."
+    },
+    {
+      "id": "HV-3.1",
+      "title": "All Gen2 VMs have Secure Boot enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Guest Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" vm-secure-boot-off-count",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "Secure Boot prevents unauthorized firmware/bootloader execution in guest VMs.",
+      "remediation": "For each Gen2 VM, run 'Set-VMFirmware -VMName <name> -EnableSecureBoot On'."
+    },
+    {
+      "id": "HV-3.2",
+      "title": "All Gen2 VMs have a virtual TPM enabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Guest Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" vm-vtpm-off-count",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "vTPM enables BitLocker and other measured-boot protections inside guest VMs.",
+      "remediation": "For each Gen2 VM, run 'Enable-VMTPM -VMName <name>' (requires Host Guardian Service for key protection)."
+    },
+    {
+      "id": "HV-3.3",
+      "title": "Guest Service Interface is disabled where not required",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Guest Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" vm-guest-services-enabled-count",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "The Guest Service Interface allows file-copy and other host-to-guest operations; it should be off unless needed.",
+      "remediation": "Disable via 'Disable-VMIntegrationService -VMName <name> -Name \"Guest Service Interface\"'."
+    },
+    {
+      "id": "HV-4.1",
+      "title": "Live Migration uses CredSSP or Kerberos (not legacy)",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Live Migration",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" live-migration-auth-type",
+      "expect": { "operator": "regex", "value": "^(CredSSP|Kerberos)$" },
+      "rationale": "Authenticated Live Migration prevents unauthorized VM movement between hosts.",
+      "remediation": "Set-VMHost -VirtualMachineMigrationAuthenticationType Kerberos (preferred when AD-joined)."
+    },
+    {
+      "id": "HV-4.2",
+      "title": "Live Migration uses compression or SMB (not uncompressed TCP/IP)",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Live Migration",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" live-migration-perf-option",
+      "expect": { "operator": "regex", "value": "^(Compression|SMB)$" },
+      "rationale": "Compressed/SMB Live Migration reduces clear-text replication time and exposure.",
+      "remediation": "Set-VMHost -VirtualMachineMigrationPerformanceOption Compression (or SMB)."
+    },
+    {
+      "id": "HV-4.3",
+      "title": "Replica server uses certificate-based authentication only",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Replication",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" replica-cert-auth-only",
+      "expect": { "operator": "in", "value": ["true", "n/a"] },
+      "rationale": "Certificate-based replication encrypts the channel and removes Kerberos delegation risk.",
+      "remediation": "Disable Kerberos on Set-VMReplicationServer or set certificate-only mode."
+    },
+    {
+      "id": "HV-5.1",
+      "title": "Default virtual machine path is not on the system drive",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Storage",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" default-vm-path-on-system-drive",
+      "expect": { "operator": "equals", "value": false },
+      "rationale": "Hosting VMs on the OS drive risks runaway disk usage taking down the host.",
+      "remediation": "Set-VMHost -VirtualMachinePath D:\\Hyper-V\\VMs (or any non-system drive)."
+    },
+    {
+      "id": "HV-5.2",
+      "title": "Default virtual hard disk path is not on the system drive",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Storage",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" default-vhd-path-on-system-drive",
+      "expect": { "operator": "equals", "value": false },
+      "rationale": "VHD files on the OS drive risks runaway disk usage taking down the host.",
+      "remediation": "Set-VMHost -VirtualHardDiskPath D:\\Hyper-V\\VHDs."
+    },
+    {
+      "id": "HV-6.1",
+      "title": "Review VMs with outstanding checkpoints/snapshots",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Operations",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{omni_data}/checks/hyperv_probe.ps1\" vm-with-snapshots-count",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "Long-lived checkpoints inflate VHD chains, slow IO, and create rollback risk.",
+      "remediation": "Merge or delete unused checkpoints with Remove-VMSnapshot."
+    },
+    {
+      "id": "HV-7.1",
+      "title": "Review virtual switch inventory (counts by type)",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Networking",
+      "type": "manual",
+      "audit": "Compare Get-VMSwitch output against your network architecture. External switches expose VMs to the physical LAN; Internal/Private isolate them.",
+      "rationale": "Switch type controls VM network exposure.",
+      "remediation": "Use Internal or Private switches for VMs that should not be reachable from outside the host."
+    },
+    {
+      "id": "HV-7.2",
+      "title": "Review virtual network adapter port ACLs and VLAN tagging",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Networking",
+      "type": "manual",
+      "audit": "Run 'Get-VMNetworkAdapterAcl' and 'Get-VMNetworkAdapterVlan' for each VM. Confirm ACLs and VLAN IDs match approved network segmentation.",
+      "rationale": "Per-adapter ACLs and VLANs enforce east-west isolation between guest VMs.",
+      "remediation": "Apply Add-VMNetworkAdapterAcl rules and Set-VMNetworkAdapterVlan as per your network design."
+    },
+    {
+      "id": "HV-8.1",
+      "title": "Manual: verify shielded-VM Host Guardian Service configuration",
+      "severity": "medium",
+      "profile": "Level 2",
+      "category": "Shielded VMs",
+      "type": "manual",
+      "audit": "If hosting shielded VMs, run 'Get-HgsClientConfiguration' and confirm attestation mode (TPM-trusted vs AD-trusted) matches policy.",
+      "rationale": "Shielded VMs require an attested HGS configuration to protect guest secrets.",
+      "remediation": "Configure HGS attestation and key protection per Microsoft's Shielded VM guide."
+    }
+  ]
+}

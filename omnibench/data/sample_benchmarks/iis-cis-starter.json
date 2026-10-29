@@ -1,0 +1,131 @@
+{
+  "benchmark": {
+    "title": "Windows IIS 10 Starter",
+    "version": "0.1",
+    "platform": "windows-iis"
+  },
+  "checks": [
+    {
+      "id": "IIS-1.1",
+      "title": "World Wide Web Publishing Service (W3SVC) is running",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Role",
+      "type": "service",
+      "service": "W3SVC",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "rationale": "Inventory check that the IIS role is active.",
+      "remediation": "Install the Web Server (IIS) role and start W3SVC."
+    },
+    {
+      "id": "IIS-2.1",
+      "title": "SSL 2.0 is disabled in the registry",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "registry",
+      "registry_path": "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\SSL 2.0\\Server",
+      "value_name": "Enabled",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "SSL 2.0 is cryptographically broken.",
+      "remediation": "Set HKLM\\...\\SCHANNEL\\Protocols\\SSL 2.0\\Server\\Enabled = 0 (DWORD) and reboot."
+    },
+    {
+      "id": "IIS-2.2",
+      "title": "SSL 3.0 is disabled in the registry",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "registry",
+      "registry_path": "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\SSL 3.0\\Server",
+      "value_name": "Enabled",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "SSL 3.0 is vulnerable to POODLE.",
+      "remediation": "Set HKLM\\...\\SCHANNEL\\Protocols\\SSL 3.0\\Server\\Enabled = 0 and reboot."
+    },
+    {
+      "id": "IIS-2.3",
+      "title": "TLS 1.0 is disabled in the registry",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "registry",
+      "registry_path": "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.0\\Server",
+      "value_name": "Enabled",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "TLS 1.0 is deprecated by PCI-DSS and major browsers.",
+      "remediation": "Set HKLM\\...\\SCHANNEL\\Protocols\\TLS 1.0\\Server\\Enabled = 0."
+    },
+    {
+      "id": "IIS-2.4",
+      "title": "TLS 1.1 is disabled in the registry",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "TLS",
+      "type": "registry",
+      "registry_path": "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.1\\Server",
+      "value_name": "Enabled",
+      "expect": { "operator": "equals", "value": 0 },
+      "rationale": "TLS 1.1 is deprecated.",
+      "remediation": "Set HKLM\\...\\SCHANNEL\\Protocols\\TLS 1.1\\Server\\Enabled = 0."
+    },
+    {
+      "id": "IIS-3.1",
+      "title": "Default site request filtering allows the default high-bit denial",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Hardening",
+      "type": "command",
+      "command": "powershell -NoProfile -Command \"(Get-WebConfigurationProperty -PSPath 'IIS:\\' -Filter 'system.webServer/security/requestFiltering' -Name 'allowHighBitCharacters').Value\"",
+      "expect": { "operator": "equals", "value": false },
+      "rationale": "Disallowing high-bit characters reduces parser-confusion attack surface.",
+      "remediation": "appcmd set config /section:requestFiltering /allowHighBitCharacters:false"
+    },
+    {
+      "id": "IIS-3.2",
+      "title": "Anonymous authentication is disabled where not needed",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Authentication",
+      "type": "manual",
+      "audit": "Run Get-WebConfigurationProperty for each site: anonymousAuthentication and confirm enabled=false for sites that should require authentication.",
+      "rationale": "Anonymous auth allows unauthenticated access; only static public sites should permit it.",
+      "remediation": "Set-WebConfigurationProperty -Filter system.webServer/security/authentication/anonymousAuthentication -Name enabled -Value false."
+    },
+    {
+      "id": "IIS-4.1",
+      "title": "X-Frame-Options header configured at the global level",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Headers",
+      "type": "command",
+      "command": "powershell -NoProfile -Command \"((Get-WebConfigurationProperty -PSPath 'IIS:\\' -Filter 'system.webServer/httpProtocol/customHeaders' -Name '.').Collection | Where-Object name -eq 'X-Frame-Options').value\"",
+      "expect": { "operator": "regex", "value": "DENY|SAMEORIGIN" },
+      "rationale": "Prevents clickjacking via iframe embedding.",
+      "remediation": "Add-WebConfigurationProperty -Filter '/system.webServer/httpProtocol/customHeaders' -Name . -Value @{name='X-Frame-Options';value='DENY'}."
+    },
+    {
+      "id": "IIS-4.2",
+      "title": "X-Content-Type-Options header configured",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Headers",
+      "type": "command",
+      "command": "powershell -NoProfile -Command \"((Get-WebConfigurationProperty -PSPath 'IIS:\\' -Filter 'system.webServer/httpProtocol/customHeaders' -Name '.').Collection | Where-Object name -eq 'X-Content-Type-Options').value\"",
+      "expect": { "operator": "equals", "value": "nosniff" },
+      "rationale": "Blocks MIME-type confusion attacks.",
+      "remediation": "Add-WebConfigurationProperty for X-Content-Type-Options = nosniff."
+    },
+    {
+      "id": "IIS-5.1",
+      "title": "Manual: review application pool identity and isolation",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Isolation",
+      "type": "manual",
+      "audit": "In IIS Manager > Application Pools, confirm each app pool uses ApplicationPoolIdentity (or a dedicated service account). Avoid using LocalSystem.",
+      "rationale": "Per-app-pool identity contains a compromised app's blast radius.",
+      "remediation": "Set processModel.identityType=ApplicationPoolIdentity per pool."
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "benchmark": {
+    "title": "GCP Foundations CIS Starter",
+    "version": "0.1",
+    "platform": "gcp"
+  },
+  "checks": [
+    {
+      "id": "GCP-1.1",
+      "title": "Manual: organization Admin role assignments are minimized",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "IAM",
+      "type": "manual",
+      "audit": "gcloud organizations get-iam-policy <ORG_ID> --format=json. Count members with roles/owner, roles/iam.organizationAdmin, roles/resourcemanager.organizationAdmin. Confirm <= 5 named individuals.",
+      "rationale": "Organization-level admin roles span the entire GCP estate.",
+      "remediation": "Replace standing org admin with PAM-style just-in-time access via Conditional IAM or Cloud Identity Access Management."
+    },
+    {
+      "id": "GCP-1.2",
+      "title": "Manual: service accounts are not granted primitive roles (Owner / Editor)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "IAM",
+      "type": "manual",
+      "audit": "gcloud projects get-iam-policy <PROJECT> --flatten='bindings[].members' --filter='bindings.role:(roles/owner OR roles/editor) AND bindings.members:serviceAccount'. Should return no rows.",
+      "rationale": "SAs with primitive roles can escalate across the project.",
+      "remediation": "Replace primitive role grants with predefined or custom roles scoped to the SA's job."
+    },
+    {
+      "id": "GCP-1.3",
+      "title": "Manual: service account keys are rotated within 90 days",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "IAM",
+      "type": "manual",
+      "audit": "For each user-managed key, run 'gcloud iam service-accounts keys list --iam-account=<sa>'. Confirm validAfterTime is within 90 days.",
+      "rationale": "Long-lived SA keys are a top breach vector when leaked in code.",
+      "remediation": "Rotate keys: 'gcloud iam service-accounts keys create ...' then delete the old. Prefer Workload Identity Federation over keys entirely."
+    },
+    {
+      "id": "GCP-2.1",
+      "title": "Manual: Cloud Audit Logging enabled for all services in the org",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Logging",
+      "type": "manual",
+      "audit": "gcloud organizations get-iam-policy <ORG> --format=json. Confirm an organization-level auditConfig exists with service=allServices and DATA_READ/DATA_WRITE/ADMIN_READ enabled.",
+      "rationale": "Audit logs are the bedrock of incident response.",
+      "remediation": "Apply an org-level auditConfig policy via 'gcloud organizations set-iam-policy'."
+    },
+    {
+      "id": "GCP-2.2",
+      "title": "Manual: log sink to immutable destination (BigQuery / Cloud Storage with retention)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging",
+      "type": "manual",
+      "audit": "gcloud logging sinks list --organization=<ORG>. Confirm at least one sink to an immutable destination with retention.",
+      "rationale": "Retained, immutable logs prevent tampering during incident response.",
+      "remediation": "Create an aggregated sink to a Cloud Storage bucket with Bucket Lock or BigQuery dataset with partition expiration."
+    },
+    {
+      "id": "GCP-3.1",
+      "title": "Manual: VPC default firewall does not allow 0.0.0.0/0 to SSH (22) or RDP (3389)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Networking",
+      "type": "manual",
+      "audit": "gcloud compute firewall-rules list --filter='direction=INGRESS AND (allowed.ports:22 OR allowed.ports:3389) AND sourceRanges:0.0.0.0/0' --format=table. Should be empty.",
+      "rationale": "Internet-exposed SSH/RDP is a top initial-access vector.",
+      "remediation": "Restrict sourceRanges to specific CIDRs or use IAP TCP forwarding for admin access."
+    },
+    {
+      "id": "GCP-3.2",
+      "title": "Manual: GCS buckets do not have allUsers / allAuthenticatedUsers IAM bindings",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Storage",
+      "type": "manual",
+      "audit": "gsutil iam get gs://<bucket> for each bucket. Confirm no 'allUsers' or 'allAuthenticatedUsers' principal.",
+      "rationale": "Public buckets are a recurrent data-leak vector.",
+      "remediation": "gsutil iam ch -d allUsers gs://<bucket> (remove). Enable uniform bucket-level access to prevent ACL drift."
+    },
+    {
+      "id": "GCP-4.1",
+      "title": "Manual: Cloud SQL instances require SSL/TLS",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Cloud SQL",
+      "type": "manual",
+      "audit": "gcloud sql instances list --format='value(name,settings.ipConfiguration.requireSsl)'. Confirm requireSsl=True.",
+      "rationale": "Without requireSsl, connections may use cleartext.",
+      "remediation": "gcloud sql instances patch <name> --require-ssl."
+    },
+    {
+      "id": "GCP-4.2",
+      "title": "Manual: Compute instances disable serial-port access",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Compute",
+      "type": "manual",
+      "audit": "gcloud compute instances list --filter='metadata.items.key=serial-port-enable AND metadata.items.value=true'. Should be empty.",
+      "rationale": "Serial console allows interactive recovery; only enable on demand.",
+      "remediation": "gcloud compute instances add-metadata <name> --metadata=serial-port-enable=false."
+    },
+    {
+      "id": "GCP-5.1",
+      "title": "Manual: Security Command Center Premium / Standard enabled at org level",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Threat Detection",
+      "type": "manual",
+      "audit": "In Cloud Console: Security Command Center. Confirm an active tier (Standard or Premium) at the organization level.",
+      "rationale": "SCC consolidates GCP threat-detection findings and posture assessment.",
+      "remediation": "Enable Security Command Center at the organization level via Cloud Console > Security."
+    }
+  ]
+}

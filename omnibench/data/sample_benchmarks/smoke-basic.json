@@ -1,0 +1,48 @@
+{
+  "benchmark": {
+    "title": "CIS Tool Smoke Benchmark",
+    "version": "1.0",
+    "platform": "local"
+  },
+  "checks": [
+    {
+      "id": "SMOKE-1",
+      "title": "Ensure README exists",
+      "severity": "low",
+      "profile": "Smoke",
+      "category": "Project Files",
+      "type": "file_exists",
+      "path": "README.md",
+      "expect": {
+        "operator": "is_true",
+        "value": true
+      },
+      "remediation": "Restore README.md."
+    },
+    {
+      "id": "SMOKE-2",
+      "title": "Ensure README names the tool",
+      "severity": "low",
+      "profile": "Smoke",
+      "category": "Project Files",
+      "type": "file_contains",
+      "path": "README.md",
+      "expect": {
+        "operator": "contains",
+        "value": "OmniBench"
+      },
+      "remediation": "Update README.md with the tool name."
+    },
+    {
+      "id": "SMOKE-3",
+      "title": "Review smoke benchmark manually",
+      "severity": "info",
+      "profile": "Smoke",
+      "category": "Analyst Review",
+      "type": "manual",
+      "audit": "Confirm the dashboard presents manual findings correctly.",
+      "remediation": "Document analyst sign-off."
+    }
+  ]
+}
+

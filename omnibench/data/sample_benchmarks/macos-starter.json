@@ -1,0 +1,44 @@
+{
+  "benchmark": {
+    "title": "macOS Starter",
+    "version": "0.1",
+    "platform": "macos"
+  },
+  "checks": [
+    {
+      "id": "1.1",
+      "title": "Verify FileVault disk encryption status",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Disk Encryption",
+      "type": "command",
+      "command": "fdesetup status 2>/dev/null || echo 'FileVault: status unknown'",
+      "expect": { "operator": "contains", "value": "On" },
+      "rationale": "Full-disk encryption protects data at rest.",
+      "remediation": "Enable FileVault via System Settings > Privacy & Security."
+    },
+    {
+      "id": "1.2",
+      "title": "Verify Application Firewall is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Firewall",
+      "type": "command",
+      "command": "/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null || echo unknown",
+      "expect": { "operator": "regex", "value": "enabled|on" },
+      "rationale": "The application firewall constrains inbound connections.",
+      "remediation": "Enable the firewall in System Settings > Network > Firewall."
+    },
+    {
+      "id": "2.1",
+      "title": "Review installed administrator accounts",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Local Accounts",
+      "type": "manual",
+      "audit": "Run 'dscl . -read /Groups/admin GroupMembership' and confirm each member is approved.",
+      "rationale": "Surplus admin accounts increase privilege exposure.",
+      "remediation": "Remove unapproved members from the admin group."
+    }
+  ]
+}

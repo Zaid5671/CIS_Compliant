@@ -1,0 +1,202 @@
+{
+  "benchmark": {
+    "title": "Windows Server Datacenter Local CIS Read-Only Benchmark",
+    "version": "1.0",
+    "platform": "windows-server-datacenter"
+  },
+  "checks": [
+    {
+      "id": "SRV-1.1.1",
+      "title": "Ensure Enforce password history is 24 or more passwords",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 password-history",
+      "expect": { "operator": "gte", "value": 24 },
+      "rationale": "Password history helps prevent users from cycling back to recently used passwords.",
+      "remediation": "Set Enforce password history to 24 or more passwords in Local Security Policy or Group Policy."
+    },
+    {
+      "id": "SRV-1.1.2",
+      "title": "Ensure Maximum password age is 365 or fewer days",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 max-password-age",
+      "expect": { "operator": "lte", "value": 365 },
+      "rationale": "Password expiration limits the time a compromised password can be used.",
+      "remediation": "Set Maximum password age to 365 days or fewer."
+    },
+    {
+      "id": "SRV-1.1.3",
+      "title": "Ensure Minimum password length is 14 or more characters",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Account Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 min-password-length",
+      "expect": { "operator": "gte", "value": 14 },
+      "rationale": "Longer passwords materially increase resistance to guessing and brute force attacks.",
+      "remediation": "Set Minimum password length to 14 or more characters."
+    },
+    {
+      "id": "SRV-1.2.1",
+      "title": "Ensure Account lockout threshold is configured between 1 and 5 attempts",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Account Lockout Policy",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 lockout-threshold-compliant",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "Account lockout slows online password guessing.",
+      "remediation": "Set Account lockout threshold to 5 or fewer invalid attempts, but not 0."
+    },
+    {
+      "id": "SRV-2.2.1",
+      "title": "Ensure local Guest account is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Local Accounts",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 guest-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "The Guest account can allow unauthenticated or weakly controlled local access.",
+      "remediation": "Disable the local Guest account."
+    },
+    {
+      "id": "SRV-2.2.2",
+      "title": "Ensure built-in local Administrator account is disabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Local Accounts",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 administrator-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "The built-in Administrator account is a common target and should not be used for routine administration.",
+      "remediation": "Disable the built-in Administrator account and use named administrative accounts."
+    },
+    {
+      "id": "SRV-9.1.1",
+      "title": "Ensure Windows Firewall Domain profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-domain",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "The host firewall reduces network attack surface.",
+      "remediation": "Enable Windows Defender Firewall for the Domain profile."
+    },
+    {
+      "id": "SRV-9.2.1",
+      "title": "Ensure Windows Firewall Private profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-private",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "The host firewall reduces network attack surface.",
+      "remediation": "Enable Windows Defender Firewall for the Private profile."
+    },
+    {
+      "id": "SRV-9.3.1",
+      "title": "Ensure Windows Firewall Public profile is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Defender Firewall",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 firewall-public",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "The host firewall reduces network attack surface on untrusted networks.",
+      "remediation": "Enable Windows Defender Firewall for the Public profile."
+    },
+    {
+      "id": "SRV-18.9.45.1",
+      "title": "Ensure Microsoft Defender real-time protection is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Microsoft Defender Antivirus",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 defender-realtime",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "Real-time protection provides continuous malware monitoring.",
+      "remediation": "Enable Microsoft Defender real-time protection."
+    },
+    {
+      "id": "SRV-18.9.45.2",
+      "title": "Ensure Microsoft Defender Antivirus service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Microsoft Defender Antivirus",
+      "type": "service",
+      "service": "WinDefend",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "rationale": "Microsoft Defender Antivirus service should be active.",
+      "remediation": "Start Microsoft Defender Antivirus Service and investigate policy conflicts."
+    },
+    {
+      "id": "SRV-18.4.3",
+      "title": "Ensure SMBv1 is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Network Services",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 smb1-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "SMBv1 is obsolete and exposes serious security weaknesses.",
+      "remediation": "Disable or remove SMBv1."
+    },
+    {
+      "id": "SRV-18.5.4.1",
+      "title": "Ensure Turn off multicast name resolution is enabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Network Configuration",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 llmnr-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "Disabling LLMNR reduces name-resolution spoofing opportunities.",
+      "remediation": "Enable the policy Turn off multicast name resolution."
+    },
+    {
+      "id": "SRV-18.9.64.1",
+      "title": "Ensure Windows Update service is running",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Windows Update",
+      "type": "service",
+      "service": "wuauserv",
+      "expect": { "field": "status", "operator": "equals", "value": "running" },
+      "rationale": "Windows Update must be available to receive security updates.",
+      "remediation": "Start and enable the Windows Update service unless managed by an approved enterprise update tool."
+    },
+    {
+      "id": "SRV-18.9.58.1",
+      "title": "Ensure Remote Desktop connections are disabled unless explicitly required",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Remote Access",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 rdp-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "Unneeded Remote Desktop access increases exposed attack surface.",
+      "remediation": "Disable Remote Desktop if it is not required, or restrict it with approved controls."
+    },
+    {
+      "id": "SRV-18.9.13.1",
+      "title": "Ensure AutoAdminLogon is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logon Security",
+      "type": "command",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File checks\\windows10_cis_probe.ps1 auto-admin-logon-disabled",
+      "expect": { "operator": "equals", "value": true },
+      "rationale": "Automatic logon can store credentials and bypass expected interactive authentication.",
+      "remediation": "Disable AutoAdminLogon and remove stored automatic logon credentials."
+    }
+  ]
+}
+

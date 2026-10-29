@@ -1,0 +1,119 @@
+{
+  "benchmark": {
+    "title": "Microsoft 365 CIS Starter",
+    "version": "0.1",
+    "platform": "microsoft-365"
+  },
+  "checks": [
+    {
+      "id": "M365-1.1",
+      "title": "Manual: legacy authentication is blocked tenant-wide",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Identity",
+      "type": "manual",
+      "audit": "Entra ID > Conditional Access > Policies. Confirm a policy blocks 'Other clients' / legacy authentication for all users, with no exclusions besides break-glass accounts.",
+      "rationale": "Legacy auth (POP, IMAP, SMTP AUTH, MAPI) bypasses MFA.",
+      "remediation": "Create a Conditional Access policy: Users=All, Cloud apps=All, Client apps=Exchange ActiveSync + Other clients, Grant=Block."
+    },
+    {
+      "id": "M365-1.2",
+      "title": "Manual: MFA required for all users via Conditional Access (or Security Defaults)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Identity",
+      "type": "manual",
+      "audit": "Entra ID > Conditional Access. Confirm a baseline 'Require MFA for all users' policy exists, or that Security Defaults are enabled.",
+      "rationale": "Tenant-wide MFA is the strongest single control against account takeover.",
+      "remediation": "Create a CA policy: Users=All, Cloud apps=All, Grant=Require MFA. Exclude only named break-glass accounts."
+    },
+    {
+      "id": "M365-1.3",
+      "title": "Manual: Self-Service Password Reset (SSPR) requires 2 methods",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Identity",
+      "type": "manual",
+      "audit": "Entra ID > Password reset > Authentication methods. Confirm 'Number of methods required to reset' = 2.",
+      "rationale": "Single-method SSPR is bypassed by SIM swap; require two.",
+      "remediation": "Set methods required = 2; enable authenticator app + security questions or phone."
+    },
+    {
+      "id": "M365-2.1",
+      "title": "Manual: Exchange Online external sender warning is enabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Exchange Online",
+      "type": "manual",
+      "audit": "Run 'Get-ExternalInOutlook' in Exchange Online PowerShell. Confirm 'Enabled = True'.",
+      "rationale": "External sender warning helps users identify phishing from spoofed domains.",
+      "remediation": "Set-ExternalInOutlook -Enabled $true in Exchange Online PowerShell."
+    },
+    {
+      "id": "M365-2.2",
+      "title": "Manual: Exchange Online auto-forwarding to external recipients is blocked",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Exchange Online",
+      "type": "manual",
+      "audit": "In the Exchange Admin Center: Mail flow > Remote domains > Default. Confirm 'AutoForwardEnabled' = False.",
+      "rationale": "BEC actors often set forwarding rules to exfiltrate mail.",
+      "remediation": "Set-RemoteDomain Default -AutoForwardEnabled $false."
+    },
+    {
+      "id": "M365-2.3",
+      "title": "Manual: Safe Links and Safe Attachments policies cover all users",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Defender for Office 365",
+      "type": "manual",
+      "audit": "Defender Portal > Email & collaboration > Policies & rules > Threat policies. Confirm Safe Links + Safe Attachments policies are enabled and applied to all recipient domains.",
+      "rationale": "Safe Links and Safe Attachments protect against phishing URLs and malicious attachments.",
+      "remediation": "Defender Portal > Threat policies > New policy of each type, applied to recipient domains."
+    },
+    {
+      "id": "M365-3.1",
+      "title": "Manual: SharePoint external sharing restricted to specific domains or guests",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "SharePoint",
+      "type": "manual",
+      "audit": "SharePoint admin center > Policies > Sharing. Confirm external sharing is 'New and existing guests' or stricter; not 'Anyone'.",
+      "rationale": "Anonymous link sharing is a recurrent data-leak vector.",
+      "remediation": "SharePoint admin center > Sharing > set to 'New and existing guests' and configure allowlist of domains."
+    },
+    {
+      "id": "M365-3.2",
+      "title": "Manual: OneDrive default sharing link is 'people you specify'",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "OneDrive",
+      "type": "manual",
+      "audit": "SharePoint admin center > Policies > Sharing > File and folder links. Confirm 'Specific people' is the default.",
+      "rationale": "Anyone-link defaults silently expose internal documents.",
+      "remediation": "Set the default link type to 'Specific people (only the people the user specifies)'."
+    },
+    {
+      "id": "M365-4.1",
+      "title": "Manual: Microsoft 365 audit log search is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Auditing",
+      "type": "manual",
+      "audit": "Defender Portal or Purview > Audit. Confirm 'Audit log search' is on. Validate with Search-UnifiedAuditLog PowerShell.",
+      "rationale": "Without unified audit logging, BEC and insider activity cannot be reconstructed.",
+      "remediation": "Set-AdminAuditLogConfig -UnifiedAuditLogIngestionEnabled $true."
+    },
+    {
+      "id": "M365-4.2",
+      "title": "Manual: Microsoft Defender Secure Score is reviewed monthly",
+      "severity": "info",
+      "profile": "Level 1",
+      "category": "Governance",
+      "type": "manual",
+      "audit": "Defender Portal > Secure Score. Confirm a documented monthly review cadence and remediation backlog.",
+      "rationale": "Secure Score is Microsoft's running posture assessment for the tenant.",
+      "remediation": "Schedule a monthly Secure Score review and burndown of recommended actions."
+    }
+  ]
+}
