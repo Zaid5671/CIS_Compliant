@@ -27,6 +27,11 @@ omnibench.ini
 *.log
 *.pid
 
+# ---- Node.js / Frontend ----
+node_modules/
+.playwright-mcp/
+omnibench/static_legacy/
+
 # ---- Local tooling, editor, and agent config ----
 .claude/
 .idea/
