@@ -459,11 +459,82 @@ def read_history(reports: Path, limit: int = HISTORY_LIMIT) -> list[dict[str, An
     return entries[:limit]
 
 
+def _classify_asset_category(platform_str: str = "", title: str = "", os_family: str = "") -> str:
+    combined = f"{platform_str} {title} {os_family}".lower()
+    if any(k in combined for k in ("firewall", "palo alto", "fortinet", "fortios", "asa", "checkpoint", "pfsense", "opnsense")):
+        return "firewall"
+    if any(k in combined for k in ("cisco", "switch", "router", "ios-xe", "ios xe", "juniper", "arista", "network")):
+        return "network"
+    if any(k in combined for k in ("linux", "ubuntu", "debian", "rhel", "centos", "redhat", "fedora", "suse", "alpine")):
+        return "linux"
+    if any(k in combined for k in ("windows", "win10", "win11", "server", "hyper-v", "domain-controller", "ad ds")):
+        return "windows"
+    return "other"
+
+
+def _resolve_asset_id(target: dict[str, Any], benchmark: dict[str, Any], host_context: dict[str, Any]) -> str:
+    category = _classify_asset_category(
+        benchmark.get("platform", ""),
+        benchmark.get("title", ""),
+        benchmark.get("os_family", ""),
+    )
+    target_type = target.get("type", "local")
+    host = target.get("host") or host_context.get("host") or ""
+    if target_type == "local":
+        node = host or platform.node() or "localhost"
+        safe_node = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", node)
+        return f"local-{category}-{safe_node}".lower()
+    elif target_type in {"remote", "ssh"}:
+        port = target.get("port", 22)
+        safe_host = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", str(host or "host"))
+        return f"ssh-{safe_host}-{port}".lower()
+    else:
+        title = benchmark.get("title") or "target"
+        safe_title = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", title)
+        return f"config-{safe_title}".lower()
+
+
+def _resolve_asset_name(target: dict[str, Any], host_context: dict[str, Any], benchmark: dict[str, Any]) -> str:
+    category = _classify_asset_category(
+        benchmark.get("platform", ""),
+        benchmark.get("title", ""),
+        benchmark.get("os_family", ""),
+    )
+    cat_label = {
+        "windows": "Windows",
+        "linux": "Linux",
+        "firewall": "Firewall",
+        "network": "Network",
+    }.get(category, "Device")
+    if target.get("type") == "local":
+        node = host_context.get("host") or platform.node() or "Local Machine"
+        return f"{node} ({cat_label})"
+    elif target.get("host"):
+        user = target.get("username")
+        host = target.get("host")
+        port = target.get("port") or 22
+        prefix = f"{user}@" if user else ""
+        return f"{prefix}{host}:{port} ({cat_label})"
+    title = benchmark.get("title") or "Asset"
+    return f"{title} ({cat_label})"
+
+
 def _summary_to_history(report: dict[str, Any]) -> dict[str, Any]:
     benchmark = report.get("benchmark", {}) if isinstance(report.get("benchmark"), dict) else {}
     target = report.get("target", {}) if isinstance(report.get("target"), dict) else {}
     summary = report.get("summary", {}) if isinstance(report.get("summary"), dict) else {}
+    host_context = report.get("host_context", {}) if isinstance(report.get("host_context"), dict) else {}
+
+    asset_id = report.get("asset_id") or _resolve_asset_id(target, benchmark, host_context)
+    asset_category = report.get("asset_category") or _classify_asset_category(
+        benchmark.get("platform", ""), benchmark.get("title", ""), benchmark.get("os_family", "")
+    )
+    asset_name = report.get("asset_name") or _resolve_asset_name(target, host_context, benchmark)
+
     return {
+        "asset_id": asset_id,
+        "asset_category": asset_category,
+        "asset_name": asset_name,
         "benchmark_title": benchmark.get("title"),
         "benchmark_version": benchmark.get("version"),
         "platform": benchmark.get("platform"),
@@ -478,6 +549,209 @@ def _summary_to_history(report: dict[str, Any]) -> dict[str, Any]:
         "duration_ms": report.get("duration_ms", 0),
         "started_at": report.get("started_at"),
         "finished_at": report.get("finished_at"),
+    }
+
+
+def _load_fleet_data(reports_dir: Path) -> dict[str, Any]:
+    assets_dir = reports_dir / "assets"
+    assets_by_id: dict[str, dict[str, Any]] = {}
+
+    # 1. Load persisted asset reports
+    if assets_dir.exists():
+        for file in assets_dir.glob("*.json"):
+            try:
+                report = json.loads(file.read_text(encoding="utf-8"))
+                target = report.get("target") or {}
+                benchmark = report.get("benchmark") or {}
+                summary = report.get("summary") or {}
+                host_context = report.get("host_context") or {}
+                asset_id = report.get("asset_id") or file.stem
+                category = report.get("asset_category") or _classify_asset_category(
+                    benchmark.get("platform", ""), benchmark.get("title", ""), benchmark.get("os_family", "")
+                )
+                name = report.get("asset_name") or _resolve_asset_name(target, host_context, benchmark)
+
+                assets_by_id[asset_id] = {
+                    "asset_id": asset_id,
+                    "name": name,
+                    "category": category,
+                    "target_type": target.get("type", "local"),
+                    "target_display": target.get("display") or target.get("host") or "Local device",
+                    "benchmark_title": benchmark.get("title", ""),
+                    "score": summary.get("score", 0),
+                    "passed": summary.get("passed", 0),
+                    "failed": summary.get("failed", 0),
+                    "errored": summary.get("errored", 0),
+                    "manual": summary.get("manual", 0),
+                    "total_checks": summary.get("total", 0),
+                    "finished_at": report.get("finished_at", ""),
+                    "severity_counts": summary.get("severity_counts", {}),
+                    "scored": summary.get("scored", True),
+                }
+            except Exception:
+                continue
+
+    # 2. Check history.jsonl for past scans not yet saved in assets/
+    history_entries = read_history(reports_dir, limit=100)
+    for entry in history_entries:
+        cat = entry.get("asset_category") or _classify_asset_category(
+            entry.get("platform", ""), entry.get("benchmark_title", "")
+        )
+        asset_id = entry.get("asset_id")
+        if not asset_id:
+            disp = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", entry.get("target_display", "local"))
+            asset_id = f"legacy-{cat}-{disp}".lower()
+        if asset_id not in assets_by_id:
+            name = entry.get("asset_name") or f"{entry.get('benchmark_title', 'Legacy')} ({cat.title()})"
+            assets_by_id[asset_id] = {
+                "asset_id": asset_id,
+                "name": name,
+                "category": cat,
+                "target_type": entry.get("target_type", "local"),
+                "target_display": entry.get("target_display", "Local device"),
+                "benchmark_title": entry.get("benchmark_title", ""),
+                "score": entry.get("score", 0),
+                "passed": entry.get("passed", 0),
+                "failed": entry.get("failed", 0),
+                "errored": entry.get("errored", 0),
+                "manual": entry.get("manual", 0),
+                "total_checks": entry.get("total_checks", 0),
+                "finished_at": entry.get("finished_at", ""),
+                "severity_counts": {},
+                "scored": True,
+            }
+
+    assets = sorted(assets_by_id.values(), key=lambda a: a.get("finished_at") or "", reverse=True)
+
+    # Calculate overall fleet score
+    scored_assets = [a for a in assets if a.get("scored", True) and (a.get("passed", 0) + a.get("failed", 0)) > 0]
+    total_passed = sum(a.get("passed", 0) for a in scored_assets)
+    total_failed = sum(a.get("failed", 0) for a in scored_assets)
+    total_evaluated = total_passed + total_failed
+    fleet_score = round((total_passed / total_evaluated) * 100, 1) if total_evaluated > 0 else 0.0
+
+    # 4 Pillar Breakdown
+    pillar_keys = ("windows", "linux", "firewall", "network")
+    category_scores: dict[str, dict[str, Any]] = {}
+    for p_key in pillar_keys:
+        p_assets = [a for a in assets if a.get("category") == p_key]
+        p_passed = sum(a.get("passed", 0) for a in p_assets)
+        p_failed = sum(a.get("failed", 0) for a in p_assets)
+        p_total_checks = sum(a.get("total_checks", 0) for a in p_assets)
+        p_eval = p_passed + p_failed
+        p_score = round((p_passed / p_eval) * 100, 1) if p_eval > 0 else 0.0
+        category_scores[p_key] = {
+            "score": p_score,
+            "count": len(p_assets),
+            "passed": p_passed,
+            "failed": p_failed,
+            "total_checks": p_total_checks,
+        }
+
+    # Aggregate Fleet Severity Counts
+    fleet_severity = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+    for a in assets:
+        for sev, cnt in a.get("severity_counts", {}).items():
+            s = str(sev).upper()
+            if s in fleet_severity:
+                fleet_severity[s] += cnt
+
+    return {
+        "fleet_score": fleet_score,
+        "total_assets": len(assets),
+        "total_evaluated_checks": total_evaluated,
+        "total_passed": total_passed,
+        "total_failed": total_failed,
+        "last_audit": assets[0]["finished_at"] if assets else None,
+        "category_scores": category_scores,
+        "severity_counts": fleet_severity,
+        "assets": assets,
+    }
+
+
+def _load_asset_report(reports_dir: Path, asset_id: str) -> dict[str, Any] | None:
+    safe_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", asset_id)
+    path = reports_dir / "assets" / f"{safe_id}.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    # Fallback to main reports dir
+    alt_path = reports_dir / f"{safe_id}.json"
+    if alt_path.exists():
+        try:
+            return json.loads(alt_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    return None
+
+
+def _load_analytics_summary(reports_dir: Path) -> dict[str, Any]:
+    history_entries = read_history(reports_dir, limit=50)
+    chrono_history = list(reversed(history_entries))
+    timeline = []
+    for h in chrono_history:
+        cat = h.get("asset_category") or _classify_asset_category(
+            h.get("platform", ""), h.get("benchmark_title", "")
+        )
+        timeline.append({
+            "date": h.get("finished_at") or h.get("started_at") or "",
+            "score": h.get("score", 0),
+            "asset_name": h.get("asset_name") or h.get("benchmark_title") or "Device",
+            "category": cat,
+            "passed": h.get("passed", 0),
+            "failed": h.get("failed", 0),
+            "total": h.get("total_checks", 0),
+        })
+
+    assets_dir = reports_dir / "assets"
+    failing_controls_map: dict[str, dict[str, Any]] = {}
+    cross_asset_severity = {
+        "windows": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+        "linux": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+        "firewall": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+        "network": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+    }
+
+    if assets_dir.exists():
+        for file in assets_dir.glob("*.json"):
+            try:
+                report = json.loads(file.read_text(encoding="utf-8"))
+                cat = report.get("asset_category") or "windows"
+                results = report.get("results") or []
+                for res in results:
+                    sev = str(res.get("severity", "MEDIUM")).upper()
+                    if cat in cross_asset_severity and sev in cross_asset_severity[cat]:
+                        if res.get("status") in {"FAIL", "WARN"}:
+                            cross_asset_severity[cat][sev] += 1
+
+                    if res.get("status") in {"FAIL", "WARN"}:
+                        cid = str(res.get("check_id") or res.get("id") or "")
+                        if not cid:
+                            continue
+                        if cid not in failing_controls_map:
+                            failing_controls_map[cid] = {
+                                "id": cid,
+                                "title": res.get("title", ""),
+                                "severity": sev,
+                                "category": res.get("category", "General"),
+                                "fail_count": 0,
+                                "affected_assets": [],
+                            }
+                        failing_controls_map[cid]["fail_count"] += 1
+                        asset_disp = report.get("asset_name") or file.stem
+                        if asset_disp not in failing_controls_map[cid]["affected_assets"]:
+                            failing_controls_map[cid]["affected_assets"].append(asset_disp)
+            except Exception:
+                continue
+
+    top_failing = sorted(failing_controls_map.values(), key=lambda x: x["fail_count"], reverse=True)[:8]
+
+    return {
+        "timeline": timeline,
+        "top_failing_controls": top_failing,
+        "cross_asset_severity": cross_asset_severity,
     }
 
 
@@ -565,6 +839,21 @@ class OMNIRequestHandler(BaseHTTPRequestHandler):
             entries = read_history(self._reports_dir())
             self._send_json({"entries": entries, "limit": HISTORY_LIMIT})
             return
+        if path == "/api/fleet":
+            self._send_json(_load_fleet_data(self._reports_dir()))
+            return
+        if path == "/api/fleet/asset":
+            params = parse_qs(parsed.query)
+            asset_id = params.get("id", [""])[0]
+            data = _load_asset_report(self._reports_dir(), asset_id)
+            if data:
+                self._send_json(data)
+            else:
+                self._send_error(HTTPStatus.NOT_FOUND, f"Asset report '{asset_id}' not found.")
+            return
+        if path == "/api/analytics/summary":
+            self._send_json(_load_analytics_summary(self._reports_dir()))
+            return
         self._send_error(HTTPStatus.NOT_FOUND, "Route not found.")
 
     def do_POST(self) -> None:
@@ -618,6 +907,34 @@ class OMNIRequestHandler(BaseHTTPRequestHandler):
                 meta, checks = load_benchmark(benchmark_payload)
                 workers = _safe_workers(options.get("workers"), 4)
                 report = run_scan(meta, checks, runner=runner, workers=workers, target=target).to_dict()
+
+                # Enrich report with Asset identity
+                target_dict = report.get("target") or {}
+                bench_dict = report.get("benchmark") or {}
+                host_dict = report.get("host_context") or {}
+
+                asset_cat = _classify_asset_category(
+                    bench_dict.get("platform", ""),
+                    bench_dict.get("title", ""),
+                    bench_dict.get("os_family", ""),
+                )
+                asset_id = _resolve_asset_id(target_dict, bench_dict, host_dict)
+                asset_name = _resolve_asset_name(target_dict, host_dict, bench_dict)
+
+                report["asset_id"] = asset_id
+                report["asset_category"] = asset_cat
+                report["asset_name"] = asset_name
+
+                # Persist to reports/assets/<asset_id>.json
+                assets_dir = self._reports_dir() / "assets"
+                assets_dir.mkdir(parents=True, exist_ok=True)
+                asset_file = assets_dir / f"{asset_id}.json"
+                try:
+                    with asset_file.open("w", encoding="utf-8") as f:
+                        json.dump(report, f, indent=2)
+                except OSError as exc:
+                    print(f"warning: could not save asset report: {exc}", file=sys.stderr)
+
                 append_history(self._reports_dir(), _summary_to_history(report))
                 self._send_json(report)
             finally:

@@ -9,7 +9,15 @@ import { AnalyticsView } from './views/AnalyticsView';
 import { HistoryView } from './views/HistoryView';
 import { ImportView } from './views/ImportView';
 import { api } from './api/client';
-import { BenchmarkCatalogItem, DeviceContext, HistoryItem, ScanReport, TargetConfig } from './types';
+import {
+  AnalyticsSummary,
+  BenchmarkCatalogItem,
+  DeviceContext,
+  FleetSummary,
+  HistoryItem,
+  ScanReport,
+  TargetConfig,
+} from './types';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -18,6 +26,8 @@ export const App: React.FC = () => {
   const [library, setLibrary] = useState<BenchmarkCatalogItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [report, setReport] = useState<ScanReport | null>(null);
+  const [fleet, setFleet] = useState<FleetSummary | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [selectedBenchmark, setSelectedBenchmark] = useState('windows10-local-cis');
   const [isScanning, setIsScanning] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -27,18 +37,52 @@ export const App: React.FC = () => {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const refreshFleetAndAnalytics = async () => {
+    try {
+      const [fData, aData] = await Promise.all([
+        api.getFleet().catch(() => null),
+        api.getAnalyticsSummary().catch(() => null),
+      ]);
+      if (fData) setFleet(fData);
+      if (aData) setAnalytics(aData);
+    } catch (err) {
+      console.error('Failed to refresh fleet data:', err);
+    }
+  };
+
+  const handleSelectAsset = async (assetId: string) => {
+    try {
+      showToast('Loading asset control findings...', 'success');
+      const assetReport = await api.getAssetReport(assetId);
+      setReport(assetReport);
+      setCurrentTab('findings');
+    } catch (err: any) {
+      showToast(err.message || 'Could not load asset report', 'error');
+    }
+  };
+
   useEffect(() => {
-    // Initial fetch of system info, benchmark library, and audit history
+    // Initial fetch of system info, benchmark library, audit history, and fleet posture
     const initData = async () => {
       try {
-        const [dev, lib, hist] = await Promise.all([
+        const [dev, lib, hist, fData, aData] = await Promise.all([
           api.getDeviceContext().catch(() => ({ host: 'Windows PC', os: 'Windows', release: '10/11', user: 'Administrator', arch: 'x64' })),
           api.getLibrary().catch(() => []),
           api.getHistory().catch(() => []),
+          api.getFleet().catch(() => null),
+          api.getAnalyticsSummary().catch(() => null),
         ]);
         setDevice(dev);
         setLibrary(lib);
         setHistory(hist);
+        if (fData) {
+          setFleet(fData);
+          if (fData.assets && fData.assets.length > 0) {
+            const latestId = fData.assets[0].asset_id;
+            api.getAssetReport(latestId).then(setReport).catch(() => {});
+          }
+        }
+        if (aData) setAnalytics(aData);
       } catch (err: any) {
         console.error('Initialization error:', err);
       }
@@ -55,8 +99,8 @@ export const App: React.FC = () => {
       setReport(scanReport);
       setCurrentTab('findings');
       showToast(`Scan complete: ${scanReport.summary.score}% compliance score`, 'success');
-      // Refresh history
       api.getHistory().then(setHistory).catch(() => {});
+      refreshFleetAndAnalytics();
     } catch (err: any) {
       showToast(err.message || 'Audit failed', 'error');
     } finally {
@@ -74,6 +118,7 @@ export const App: React.FC = () => {
       setCurrentTab('findings');
       showToast(`Audit completed successfully with ${scanReport.summary.score}% score`, 'success');
       api.getHistory().then(setHistory).catch(() => {});
+      refreshFleetAndAnalytics();
     } catch (err: any) {
       showToast(err.message || 'Audit execution failed', 'error');
     } finally {
@@ -90,6 +135,7 @@ export const App: React.FC = () => {
       setCurrentTab('findings');
       showToast(`Audit completed with ${scanReport.summary.score}% score`, 'success');
       api.getHistory().then(setHistory).catch(() => {});
+      refreshFleetAndAnalytics();
     } catch (err: any) {
       showToast(err.message || 'Custom scan failed', 'error');
     } finally {
@@ -149,8 +195,10 @@ export const App: React.FC = () => {
           {currentTab === 'dashboard' && (
             <DashboardView
               report={report}
+              fleet={fleet}
               onNavigateTab={setCurrentTab}
               onLaunchBenchmark={handleLaunchBenchmark}
+              onSelectAsset={handleSelectAsset}
             />
           )}
 
@@ -168,7 +216,9 @@ export const App: React.FC = () => {
           {currentTab === 'findings' && (
             <FindingsView
               report={report}
+              fleet={fleet}
               onNavigateTab={setCurrentTab}
+              onSelectAsset={handleSelectAsset}
             />
           )}
 
@@ -181,7 +231,12 @@ export const App: React.FC = () => {
           )}
 
           {currentTab === 'analytics' && (
-            <AnalyticsView report={report} />
+            <AnalyticsView
+              report={report}
+              fleet={fleet}
+              analytics={analytics}
+              onNavigateTab={setCurrentTab}
+            />
           )}
 
           {currentTab === 'history' && (

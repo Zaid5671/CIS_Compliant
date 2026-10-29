@@ -64,6 +64,87 @@ export interface ScanReport {
   finished_at: string;
   duration_ms: number;
   results: CheckResult[];
+  asset_id?: string;
+  asset_category?: string;
+  asset_name?: string;
+}
+
+export interface FleetAsset {
+  asset_id: string;
+  name: string;
+  category: 'windows' | 'linux' | 'firewall' | 'network' | 'other';
+  target_type: 'local' | 'remote' | 'offline_config';
+  target_display: string;
+  benchmark_title: string;
+  score: number;
+  passed: number;
+  failed: number;
+  errored: number;
+  manual: number;
+  total_checks: number;
+  finished_at: string;
+  severity_counts: Record<string, number>;
+  scored: boolean;
+}
+
+export interface CategoryPillarScore {
+  score: number;
+  count: number;
+  passed: number;
+  failed: number;
+  total_checks: number;
+}
+
+export interface FleetSummary {
+  fleet_score: number;
+  total_assets: number;
+  total_evaluated_checks: number;
+  total_passed: number;
+  total_failed: number;
+  last_audit: string | null;
+  category_scores: {
+    windows: CategoryPillarScore;
+    linux: CategoryPillarScore;
+    firewall: CategoryPillarScore;
+    network: CategoryPillarScore;
+  };
+  severity_counts: {
+    CRITICAL: number;
+    HIGH: number;
+    MEDIUM: number;
+    LOW: number;
+  };
+  assets: FleetAsset[];
+}
+
+export interface TimelinePoint {
+  date: string;
+  score: number;
+  asset_name: string;
+  category: string;
+  passed: number;
+  failed: number;
+  total: number;
+}
+
+export interface FailingControl {
+  id: string;
+  title: string;
+  severity: string;
+  category: string;
+  fail_count: number;
+  affected_assets: string[];
+}
+
+export interface AnalyticsSummary {
+  timeline: TimelinePoint[];
+  top_failing_controls: FailingControl[];
+  cross_asset_severity: {
+    windows: Record<string, number>;
+    linux: Record<string, number>;
+    firewall: Record<string, number>;
+    network: Record<string, number>;
+  };
 }
 
 export interface TargetConfig {

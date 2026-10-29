@@ -1,4 +1,12 @@
-import { BenchmarkCatalogItem, DeviceContext, HistoryItem, ScanReport, TargetConfig } from '../types';
+import {
+  AnalyticsSummary,
+  BenchmarkCatalogItem,
+  DeviceContext,
+  FleetSummary,
+  HistoryItem,
+  ScanReport,
+  TargetConfig,
+} from '../types';
 
 function getSessionToken(): string {
   const metaToken = document.querySelector('meta[name="omni-token"]')?.getAttribute('content');
@@ -153,6 +161,26 @@ export const api = {
       const err = await res.json();
       throw new Error(err.error || 'Failed to parse benchmark');
     }
+    return res.json();
+  },
+
+  async getFleet(): Promise<FleetSummary> {
+    const res = await fetch('/api/fleet', { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch fleet aggregation');
+    return res.json();
+  },
+
+  async getAssetReport(assetId: string): Promise<ScanReport> {
+    const res = await fetch(`/api/fleet/asset?id=${encodeURIComponent(assetId)}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Failed to load asset report for ${assetId}`);
+    return res.json();
+  },
+
+  async getAnalyticsSummary(): Promise<AnalyticsSummary> {
+    const res = await fetch('/api/analytics/summary', { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch analytics summary');
     return res.json();
   },
 };

@@ -13,16 +13,27 @@ import {
   X, 
   ExternalLink,
   Terminal,
-  ChevronRight
+  ChevronRight,
+  Laptop,
+  Server,
+  Shield,
+  HardDrive
 } from 'lucide-react';
-import { CheckResult, CheckStatus, ScanReport, Severity } from '../types';
+import { CheckResult, CheckStatus, FleetSummary, ScanReport, Severity } from '../types';
 
 interface FindingsViewProps {
   report: ScanReport | null;
+  fleet?: FleetSummary | null;
   onNavigateTab: (tab: string) => void;
+  onSelectAsset?: (assetId: string) => void;
 }
 
-export const FindingsView: React.FC<FindingsViewProps> = ({ report, onNavigateTab }) => {
+export const FindingsView: React.FC<FindingsViewProps> = ({
+  report,
+  fleet,
+  onNavigateTab,
+  onSelectAsset,
+}) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
@@ -35,16 +46,36 @@ export const FindingsView: React.FC<FindingsViewProps> = ({ report, onNavigateTa
         <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
           <Terminal className="w-6 h-6" />
         </div>
-        <h3 className="text-lg font-bold text-white">No Audit Findings Yet</h3>
+        <h3 className="text-lg font-bold text-white">No Active Audit Findings</h3>
         <p className="text-sm text-zinc-400">
           Load a CIS benchmark and execute a scan against your local device or remote host to view control evaluation details.
         </p>
-        <button
-          onClick={() => onNavigateTab('setup')}
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-colors cursor-pointer"
-        >
-          Go to Setup Scan &rarr;
-        </button>
+
+        {fleet && fleet.assets && fleet.assets.length > 0 && onSelectAsset && (
+          <div className="pt-2 border-t border-zinc-800 space-y-2">
+            <span className="text-xs text-zinc-400 block font-medium">Or select an audited device from the fleet:</span>
+            <div className="flex flex-wrap justify-center gap-2">
+              {fleet.assets.map((a) => (
+                <button
+                  key={a.asset_id}
+                  onClick={() => onSelectAsset(a.asset_id)}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-purple-600 text-xs font-semibold text-zinc-200 hover:text-white transition-colors cursor-pointer"
+                >
+                  {a.name} ({a.score}%)
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="pt-2">
+          <button
+            onClick={() => onNavigateTab('setup')}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-colors cursor-pointer"
+          >
+            Go to Setup Scan &rarr;
+          </button>
+        </div>
       </div>
     );
   }
@@ -135,6 +166,47 @@ export const FindingsView: React.FC<FindingsViewProps> = ({ report, onNavigateTa
 
   return (
     <div className="space-y-6">
+      {/* Device Switcher & Context Bar */}
+      <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-purple-600/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+            <Laptop className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-400">Audited Appliance</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-700 bg-zinc-800 text-zinc-300 font-mono">
+                {report.summary?.score ?? 0}% Compliance
+              </span>
+              <span className="text-[10px] text-zinc-500 font-mono">
+                ({report.results.length} Controls)
+              </span>
+            </div>
+            <h3 className="font-bold text-white text-sm">
+              {report.asset_name || report.target.display || report.target.host || 'Local Workstation'}
+            </h3>
+          </div>
+        </div>
+
+        {/* Device Switcher Dropdown */}
+        {fleet && fleet.assets && fleet.assets.length > 1 && onSelectAsset && (
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-xs text-zinc-400 font-medium">Switch Target:</span>
+            <select
+              value={report.asset_id || ''}
+              onChange={(e) => onSelectAsset(e.target.value)}
+              className="bg-zinc-950 border border-zinc-800 hover:border-purple-500 text-zinc-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-purple-500 cursor-pointer transition-colors"
+            >
+              {fleet.assets.map((a) => (
+                <option key={a.asset_id} value={a.asset_id}>
+                  {a.name} — {a.score}% ({a.total_checks} checks)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       {/* Search & Filter Toolbar */}
       <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex flex-1 items-center gap-3">
