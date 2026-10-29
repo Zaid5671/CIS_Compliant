@@ -1,0 +1,20 @@
+# Normalize text to LF in the repository; let Git pick native EOL on checkout.
+* text=auto eol=lf
+
+# Shell scripts must stay LF (shebang).
+*.sh text eol=lf
+
+# Windows scripts are CRLF on checkout.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets — never touch EOLs.
+*.woff2 binary
+*.woff binary
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Keep generated/vendored noise out of language stats and diffs.
+omnibench/static/fonts/** linguist-vendored

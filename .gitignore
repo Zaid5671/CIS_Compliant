@@ -1,0 +1,38 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+
+# ---- OmniBench runtime output ----
+# Scan reports and history can contain hostnames, usernames, and command
+# evidence from the audited machine. Never commit them.
+reports/
+*.token
+session.token
+history.jsonl
+omnibench.ini
+
+# ---- Logs / process files ----
+*.log
+*.pid
+
+# ---- Local tooling, editor, and agent config ----
+.claude/
+.idea/
+.vscode/
+*.code-workspace
+
+# ---- OS cruft ----
+.DS_Store
+Thumbs.db
