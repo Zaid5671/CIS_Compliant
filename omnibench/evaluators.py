@@ -100,6 +100,7 @@ def _evaluate_file_exists(check: Check, runner: Runner) -> CheckResult:
         evidence=f"{path} exists: {exists}",
         expected=expected,
         actual=actual,
+        command=f'Test-Path "{path}"',
     )
 
 
@@ -123,12 +124,14 @@ def _evaluate_file_contains(check: Check, runner: Runner) -> CheckResult:
         expect["value"] = fallback
 
     matched, actual, expected = _matches_expect(content, expect)
+    pattern_val = fallback or expect.get("value", "")
     return _base_result(
         check,
         PASS if matched else FAIL,
         evidence=_clip(_matching_line(content, str(expect.get("value", ""))) or f"Read {len(content)} characters from {path}."),
         expected=expected,
         actual=actual,
+        command=f'Select-String -Path "{path}" -Pattern "{pattern_val}"',
     )
 
 
@@ -142,21 +145,23 @@ def _evaluate_registry(check: Check, runner: Runner) -> CheckResult:
         return _base_result(check, ERROR, evidence="Missing registry value name.")
 
     hive, key = _split_registry_path(registry_path, hive_text, key_text)
+    pretty_path = registry_path or f"{hive}\\{key}"
+    probe_cmd = f'reg query "{pretty_path}" /v "{value_name}"'
     try:
         value, value_type = runner.query_registry(hive, key, value_name)
     except RuntimeError as exc:
         if "only supported on windows" in str(exc).lower():
-            return _base_result(check, WARN, evidence=str(exc))
-        return _base_result(check, FAIL, evidence=str(exc))
+            return _base_result(check, WARN, evidence=str(exc), command=probe_cmd)
+        return _base_result(check, FAIL, evidence=str(exc), command=probe_cmd)
 
     matched, actual, expected = _matches_expect(value, check.expect)
-    pretty_path = registry_path or f"{hive}\\{key}"
     return _base_result(
         check,
         PASS if matched else FAIL,
         evidence=f"Registry value {pretty_path}\\{value_name} = {value!r} ({value_type}).",
         expected=expected,
         actual=actual,
+        command=probe_cmd,
     )
 
 
@@ -165,6 +170,7 @@ def _evaluate_service(check: Check, runner: Runner) -> CheckResult:
     if not service_name:
         return _base_result(check, ERROR, evidence="Missing service name.", expected=_expect_text(check.expect))
 
+    probe_cmd = f'Get-Service -Name "{service_name}"'
     state = runner.query_service(service_name)
     field_name = str(check.expect.get("field") or "status") if check.expect else "status"
     actual_value = state.get(field_name, state.get("status", "unknown"))
@@ -175,6 +181,7 @@ def _evaluate_service(check: Check, runner: Runner) -> CheckResult:
         evidence=", ".join(f"{key}: {value}" for key, value in state.items()),
         expected=expected,
         actual=actual,
+        command=probe_cmd,
     )
 
 
@@ -184,6 +191,7 @@ def _manual_result(check: Check) -> CheckResult:
         MANUAL,
         evidence=check.audit or check.description or "Manual review required.",
         expected=_expect_text(check.expect),
+        command="Manual administrative review (no automated probe)",
     )
 
 
@@ -262,6 +270,7 @@ def _base_result(
     error: str = "",
     command: str = "",
 ) -> CheckResult:
+    resolved_cmd = command or _display_command(check.params.get("command") or "")
     return CheckResult(
         check_id=check.id,
         title=check.title,
@@ -276,7 +285,7 @@ def _base_result(
         remediation=check.remediation,
         rationale=check.rationale,
         error=error,
-        command=command,
+        command=resolved_cmd,
         metadata=check.metadata,
     )
 

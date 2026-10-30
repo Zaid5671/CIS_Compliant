@@ -17,9 +17,22 @@ import {
   Laptop,
   Server,
   Shield,
-  HardDrive
+  HardDrive,
+  ShieldAlert,
+  Clock,
+  Share2,
+  Layers,
+  Lock,
+  BookOpen,
+  Info,
+  ListChecks,
+  Activity,
+  Sparkles,
+  Wrench,
+  ShieldCheck
 } from 'lucide-react';
 import { CheckResult, CheckStatus, FleetSummary, ScanReport, Severity } from '../types';
+import { enrichFinding, generateMarkdownTicket } from '../utils/findingEnricher';
 
 interface FindingsViewProps {
   report: ScanReport | null;
@@ -38,7 +51,35 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [selectedFinding, setSelectedFinding] = useState<CheckResult | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedAuditCmd, setCopiedAuditCmd] = useState(false);
+  const [copiedFixCmd, setCopiedFixCmd] = useState(false);
+  const [copiedEvidence, setCopiedEvidence] = useState(false);
+  const [copiedTicket, setCopiedTicket] = useState(false);
+
+  const copyAuditCommand = (cmd: string) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedAuditCmd(true);
+    setTimeout(() => setCopiedAuditCmd(false), 2000);
+  };
+
+  const copyFixCommand = (cmd: string) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedFixCmd(true);
+    setTimeout(() => setCopiedFixCmd(false), 2000);
+  };
+
+  const copyEvidence = (ev: string) => {
+    navigator.clipboard.writeText(ev);
+    setCopiedEvidence(true);
+    setTimeout(() => setCopiedEvidence(false), 2000);
+  };
+
+  const copyTicket = (finding: CheckResult) => {
+    const ticket = generateMarkdownTicket(finding, report?.asset_name || report?.target.display || 'Local Machine');
+    navigator.clipboard.writeText(ticket);
+    setCopiedTicket(true);
+    setTimeout(() => setCopiedTicket(false), 2000);
+  };
 
   if (!report || !report.results.length) {
     return (
@@ -94,14 +135,8 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
     return true;
   });
 
-  const copyRemediation = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const downloadRemediationPlaybook = () => {
-    const failedChecks = report.results.filter(r => (r.status === 'FAIL' || r.status === 'WARN') && r.remediation);
+    const failedChecks = report.results.filter(r => (r.status === 'FAIL' || r.status === 'WARN'));
     const title = report.benchmark.title.toLowerCase();
     const isWindows = title.includes('windows');
     const isCisco = title.includes('cisco') || title.includes('catalyst') || title.includes('ios') || title.includes('asa');
@@ -121,7 +156,10 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
         '! Paste into "configure terminal" session on the Cisco appliance:',
         '! ==========================================================================\n',
         'configure terminal',
-        ...failedChecks.map(c => `! --- [${c.check_id}] ${c.title} ---\n${c.remediation}\n`),
+        ...failedChecks.map(c => {
+          const enriched = enrichFinding(c, report.asset_name);
+          return `! --- [${c.check_id}] ${c.title} ---\n${enriched.remediationCommand || c.remediation}\n`;
+        }),
         'end',
         'write memory\n',
       ].join('\n');
@@ -134,7 +172,10 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
         `# Generated: ${new Date().toISOString()}`,
         '# Paste directly into FortiGate SSH CLI:',
         '# ==========================================================================\n',
-        ...failedChecks.map(c => `# --- [${c.check_id}] ${c.title} ---\n${c.remediation}\n`),
+        ...failedChecks.map(c => {
+          const enriched = enrichFinding(c, report.asset_name);
+          return `# --- [${c.check_id}] ${c.title} ---\n${enriched.remediationCommand || c.remediation}\n`;
+        }),
       ].join('\n');
     } else if (isPaloAlto) {
       filename = 'cisguard-remediation-panos.set';
@@ -147,7 +188,10 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
         '# ==========================================================================\n',
         'set cli scripting-mode on',
         'configure',
-        ...failedChecks.map(c => `# --- [${c.check_id}] ${c.title} ---\n${c.remediation}\n`),
+        ...failedChecks.map(c => {
+          const enriched = enrichFinding(c, report.asset_name);
+          return `# --- [${c.check_id}] ${c.title} ---\n${enriched.remediationCommand || c.remediation}\n`;
+        }),
         'commit',
       ].join('\n');
     } else if (isWindows) {
@@ -156,10 +200,14 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
         '# ==========================================================================',
         '# CISGuard Automated Remediation Playbook (PowerShell)',
         `# Benchmark: ${report.benchmark.title}`,
+        `# Target: ${report.asset_name || 'Local Windows Device'}`,
         `# Generated: ${new Date().toISOString()}`,
         '# DISCLAIMER: Review each command before executing in production.',
         '# ==========================================================================\n',
-        ...failedChecks.map(c => `Write-Host "Applying fix for: [${c.check_id}] ${c.title}" -ForegroundColor Cyan\n# Rationale: ${c.rationale}\n${c.remediation}\n`),
+        ...failedChecks.map(c => {
+          const enriched = enrichFinding(c, report.asset_name);
+          return `Write-Host "Applying fix for: [${c.check_id}] ${c.title}" -ForegroundColor Cyan\n# Guidance: ${enriched.remediationInstructions}\n${enriched.remediationCommand}\n`;
+        }),
       ].join('\n');
     } else {
       filename = 'cisguard-remediation.sh';
@@ -171,7 +219,10 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
         `# Generated: ${new Date().toISOString()}`,
         '# DISCLAIMER: Review each command before executing in production.',
         '# ==========================================================================\nset -e\n',
-        ...failedChecks.map(c => `echo "Applying fix for: [${c.check_id}] ${c.title}"\n# Rationale: ${c.rationale}\n${c.remediation}\n`),
+        ...failedChecks.map(c => {
+          const enriched = enrichFinding(c, report.asset_name);
+          return `echo "Applying fix for: [${c.check_id}] ${c.title}"\n# Rationale: ${c.rationale}\n${enriched.remediationCommand || c.remediation}\n`;
+        }),
       ].join('\n');
     }
 
@@ -357,93 +408,298 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
       </div>
 
       {/* Slide-over Remediation & Details Drawer */}
-      {selectedFinding && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-xl bg-[#0e0e14] border-l border-zinc-800 h-full p-6 overflow-y-auto space-y-6 shadow-2xl animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-zinc-800/80">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-zinc-800 text-purple-300 border border-zinc-700">
-                    {selectedFinding.check_id}
-                  </span>
-                  {getStatusBadge(selectedFinding.status)}
-                  {getSeverityBadge(selectedFinding.severity)}
-                </div>
-                <h3 className="text-base font-bold text-white leading-snug">{selectedFinding.title}</h3>
-                <p className="text-xs text-zinc-400">Category: {selectedFinding.category}</p>
-              </div>
-              <button
-                onClick={() => setSelectedFinding(null)}
-                className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {selectedFinding && (() => {
+        const enriched = enrichFinding(selectedFinding, report.asset_name || report.target.display || 'Local Machine');
+        return (
+          <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="w-full max-w-2xl bg-[#0b0c10] border-l border-zinc-800/90 h-full p-6 overflow-y-auto space-y-6 shadow-2xl animate-in slide-in-from-right duration-200">
+              
+              {/* 1. Drawer Header & Meta */}
+              <div className="space-y-3 pb-4 border-b border-zinc-800/80">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded bg-zinc-800 text-purple-300 border border-zinc-700">
+                      {selectedFinding.check_id}
+                    </span>
+                    {getStatusBadge(selectedFinding.status)}
+                    {getSeverityBadge(selectedFinding.severity)}
+                    <span className="text-[11px] font-medium text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+                      {selectedFinding.profile || 'Level 1'}
+                    </span>
+                    {selectedFinding.status === 'FAIL' && enriched.scorePenalty > 0 && (
+                      <span className="text-[11px] font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/25 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        -{enriched.scorePenalty} pts Penalty
+                      </span>
+                    )}
+                    {selectedFinding.status === 'PASS' && (
+                      <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Compliant
+                      </span>
+                    )}
+                  </div>
 
-            {/* Side-by-Side Comparison Box (PS Requirement) */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Deterministic Comparison</span>
-              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
-                <div>
-                  <span className="text-[11px] text-zinc-400 font-semibold block">Expected CIS Value</span>
-                  <div className="mt-1 font-mono text-xs text-emerald-400 bg-emerald-950/20 p-2 rounded border border-emerald-900/40 overflow-x-auto">
-                    {selectedFinding.expected || 'exit code 0'}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => copyTicket(selectedFinding)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-medium transition-colors cursor-pointer"
+                      title="Copy full finding report formatted for Jira / ServiceNow tickets"
+                    >
+                      {copiedTicket ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-purple-400" />}
+                      <span>{copiedTicket ? 'Ticket Copied!' : 'Copy Ticket'}</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedFinding(null)}
+                      className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                      title="Close side panel"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
+
                 <div>
-                  <span className="text-[11px] text-zinc-400 font-semibold block">Actual Device Output</span>
-                  <div className="mt-1 font-mono text-xs text-rose-400 bg-rose-950/20 p-2 rounded border border-rose-950/40 overflow-x-auto">
-                    {selectedFinding.actual || 'Null / Not set'}
+                  <h3 className="text-base font-bold text-white leading-snug">
+                    {selectedFinding.title}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400 mt-1">
+                    <span>Category: <strong className="text-zinc-300 font-medium">{selectedFinding.category}</strong></span>
+                    <span>•</span>
+                    <span>Target: <strong className="text-zinc-300 font-medium">{report.asset_name || report.target.display || 'Local Host'}</strong></span>
+                    {selectedFinding.duration_ms > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 font-mono text-[11px] text-zinc-500">
+                          <Clock className="w-3 h-3" />
+                          {selectedFinding.duration_ms} ms probe latency
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Evidence Block */}
-            {selectedFinding.evidence && (
-              <div className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Evidence / Command Output</span>
-                <pre className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800/90 font-mono text-xs text-zinc-300 overflow-x-auto max-h-48 whitespace-pre-wrap">
-                  {selectedFinding.evidence}
-                </pre>
-              </div>
-            )}
-
-            {/* Remediation CLI Terminal (PS Requirement) */}
-            {selectedFinding.remediation && (
+              {/* 2. Audit Probe Command Box (Exact command CISGuard runs) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
                     <Terminal className="w-3.5 h-3.5" />
-                    Exact CLI Remediation Command
+                    Audit Probe & Executed Command
                   </span>
-                  <button
-                    onClick={() => copyRemediation(selectedFinding.remediation)}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copied ? 'Copied!' : 'Copy Fix'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                      {enriched.auditType}
+                    </span>
+                    <button
+                      onClick={() => copyAuditCommand(enriched.auditCommand)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+                    >
+                      {copiedAuditCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedAuditCmd ? 'Copied' : 'Copy Command'}</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="p-3.5 rounded-xl bg-zinc-950 border border-purple-500/30 text-purple-200 font-mono text-xs leading-relaxed">
-                  {selectedFinding.remediation}
+                <div className="rounded-xl bg-black border border-zinc-800 p-3.5 font-mono text-xs text-purple-300 overflow-x-auto shadow-inner">
+                  <div className="text-[10px] text-zinc-500 mb-1 select-none"># Audit verification command executed against target:</div>
+                  <div className="select-all text-purple-200 whitespace-pre-wrap">{enriched.auditCommand}</div>
                 </div>
               </div>
-            )}
 
-            {/* CIS Rationale */}
-            {selectedFinding.rationale && (
+              {/* 3. Deterministic Value Comparison Box (PS Section 4 Requirement) */}
               <div className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Audit Rationale</span>
-                <p className="text-xs text-zinc-300 leading-relaxed p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-                  {selectedFinding.rationale}
-                </p>
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-zinc-400" />
+                  Deterministic Baseline Comparison
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800">
+                  {/* Expected CIS Value */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                        Expected CIS Baseline
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">Target Standard</span>
+                    </div>
+                    <div className="font-mono text-xs font-bold text-emerald-300 bg-emerald-950/30 p-2.5 rounded-lg border border-emerald-900/50 overflow-x-auto">
+                      {enriched.expectedBaseline}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      {enriched.expectedDescription}
+                    </p>
+                  </div>
+
+                  {/* Actual Device Output */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[11px] font-semibold flex items-center gap-1 ${
+                        selectedFinding.status === 'PASS' ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full inline-block ${
+                          selectedFinding.status === 'PASS' ? 'bg-emerald-500' : 'bg-rose-500'
+                        }`}></span>
+                        Actual Machine Output
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">Audited State</span>
+                    </div>
+                    <div className={`font-mono text-xs font-bold p-2.5 rounded-lg border overflow-x-auto ${
+                      selectedFinding.status === 'PASS' 
+                        ? 'text-emerald-300 bg-emerald-950/30 border-emerald-900/50' 
+                        : 'text-rose-300 bg-rose-950/30 border-rose-900/50'
+                    }`}>
+                      {enriched.actualValue}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      {enriched.actualDescription}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
+
+              {/* 4. Evidence / Command Stdout */}
+              {selectedFinding.evidence && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                      Raw Terminal Output & Evidence
+                    </span>
+                    <button
+                      onClick={() => copyEvidence(selectedFinding.evidence)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                    >
+                      {copiedEvidence ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedEvidence ? 'Copied' : 'Copy Output'}</span>
+                    </button>
+                  </div>
+                  <pre className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800/90 font-mono text-xs text-zinc-300 overflow-x-auto max-h-40 whitespace-pre-wrap leading-relaxed">
+                    {selectedFinding.evidence}
+                  </pre>
+                </div>
+              )}
+
+              {/* 5. Remediation & Hardening (Dual View: Plain English + Runnable CLI Command) */}
+              <div className="space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-emerald-400" />
+                  Actionable Remediation & Resolution
+                </span>
+
+                {/* Sub-block A: Plain English Instructions */}
+                <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/25 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
+                    <Info className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Resolution Guidance (Plain English / GUI Policy)</span>
+                  </div>
+                  <p className="text-xs text-zinc-200 leading-relaxed">
+                    {enriched.remediationInstructions}
+                  </p>
+                </div>
+
+                {/* Sub-block B: Exact CLI Fix Command */}
+                {enriched.remediationCommand && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+                        <Terminal className="w-3.5 h-3.5" />
+                        Exact CLI Remediation Command
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-zinc-400 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
+                          {enriched.remediationShell}
+                        </span>
+                        <button
+                          onClick={() => copyFixCommand(enriched.remediationCommand)}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                        >
+                          {copiedFixCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedFixCmd ? 'Copied!' : 'Copy Fix Command'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-black border border-emerald-500/30 font-mono text-xs text-emerald-300 overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-inner">
+                      {enriched.remediationCommand}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 6. Regulatory Framework Mappings (NIST SP 800-53 / CIS Controls v8 / MITRE ATT&CK) */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-blue-400" />
+                  Compliance Framework Cross-Mapping
+                </span>
+                <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2.5">
+                  {/* NIST Controls */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 block mb-1">
+                      NIST SP 800-53 Rev 5 Controls
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {enriched.nistControls.map((ctrl) => (
+                        <span key={ctrl} className="px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/25 text-[11px] font-mono">
+                          {ctrl}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CIS Safeguards */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 block mb-1">
+                      CIS Controls v8 Safeguards
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {enriched.cisSafeguards.map((sg) => (
+                        <span key={sg} className="px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/25 text-[11px] font-mono">
+                          {sg}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* MITRE ATT&CK Mitigation */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 block mb-1">
+                      MITRE ATT&CK Threat Alignment
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {enriched.mitreAttack.map((atk) => (
+                        <span key={atk} className="px-2.5 py-0.5 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/25 text-[11px] font-mono">
+                          {atk}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 7. CIS Audit Rationale & Threat Mitigation */}
+              {selectedFinding.rationale && (
+                <div className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-zinc-400" />
+                    Audit Rationale & Threat Mitigation
+                  </span>
+                  <p className="text-xs text-zinc-300 leading-relaxed p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800">
+                    {selectedFinding.rationale}
+                  </p>
+                </div>
+              )}
+
+              {/* 8. Audit Engine Telemetry */}
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+                <span className="flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-purple-400" />
+                  Evaluation Engine: Deterministic Rule Matcher
+                </span>
+                <span>CIS Profile: {selectedFinding.profile || 'Level 1'}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
