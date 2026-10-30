@@ -90,6 +90,30 @@
       "remediation": "conf t ; ip access-list standard MGMT ; permit <subnet> ; line vty 0 15 ; access-class MGMT in ; end."
     },
     {
+      "id": "CISCO-3.3",
+      "title": "Detect overly permissive access-lists (permit ip any any)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Access Control Lists",
+      "type": "command",
+      "command": "show ip access-lists | include permit ip any any",
+      "expect": { "operator": "regex", "value": "^$" },
+      "rationale": "Overly broad any-any permit statements allow unauthorized traversal across routing boundaries.",
+      "remediation": "Audit access-lists and replace any-any rules with explicit source and destination restrictions."
+    },
+    {
+      "id": "CISCO-3.4",
+      "title": "Ensure IP directed-broadcast is disabled on all interfaces",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Routing Hardening",
+      "type": "command",
+      "command": "show running-config | include ip directed-broadcast",
+      "expect": { "operator": "regex", "value": "no ip directed-broadcast|^$" },
+      "rationale": "IP directed broadcast packets can be used as an amplifier in Smurf Denial of Service (DoS) attacks.",
+      "remediation": "conf t ; interface <interface> ; no ip directed-broadcast ; end."
+    },
+    {
       "id": "CISCO-4.1",
       "title": "Logging buffered at notification level (5) or higher",
       "severity": "medium",
@@ -109,20 +133,33 @@
       "category": "Time",
       "type": "command",
       "command": "show running-config | include ^ntp",
-      "expect": { "operator": "regex", "value": "ntp authentication-key" },
+      "expect": { "operator": "regex", "value": "ntp (authentication-key|server)" },
       "rationale": "Authenticated NTP prevents spoofed time updates affecting cert/Kerberos validity.",
       "remediation": "conf t ; ntp authenticate ; ntp authentication-key 1 sha256 <key> ; ntp trusted-key 1 ; ntp server <ip> key 1 ; end."
     },
     {
+      "id": "CISCO-4.3",
+      "title": "Ensure remote Syslog server is configured",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging",
+      "type": "command",
+      "command": "show running-config | include ^logging host",
+      "expect": { "operator": "regex", "value": "logging host \\d+\\.\\d+\\.\\d+\\.\\d+" },
+      "rationale": "Centralized logging ensures security events and configuration changes are recorded on external SIEM systems.",
+      "remediation": "conf t ; logging host <syslog-ip> ; logging trap informational ; end."
+    },
+    {
       "id": "CISCO-5.1",
-      "title": "Manual: SNMP communities are not default and use v3 with authPriv",
+      "title": "Ensure default SNMP community strings (public/private) are removed",
       "severity": "high",
       "profile": "Level 1",
       "category": "Management Plane",
-      "type": "manual",
-      "audit": "Run 'show running-config | include snmp-server'. Confirm no 'public' / 'private' communities and that v3 users are configured with auth + priv (sha + aes).",
-      "rationale": "Default SNMP communities allow information disclosure and config changes.",
-      "remediation": "Remove community strings; configure 'snmp-server group ... v3 priv' with sha+aes."
+      "type": "command",
+      "command": "show running-config | include snmp-server community (public|private)",
+      "expect": { "operator": "regex", "value": "^$" },
+      "rationale": "Default community strings allow unauthorized attackers to query or modify device state over SNMP.",
+      "remediation": "conf t ; no snmp-server community public ; no snmp-server community private ; end."
     }
   ]
 }

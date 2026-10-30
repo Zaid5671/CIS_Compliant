@@ -1,0 +1,250 @@
+{
+  "benchmark": {
+    "title": "CIS Cisco Catalyst Switch Benchmark",
+    "version": "1.0",
+    "platform": "cisco-catalyst"
+  },
+  "checks": [
+    {
+      "id": "CISCO-SW-1.1",
+      "title": "Ensure Telnet is disabled on VTY lines",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "command",
+      "command": "show running-config | section line vty",
+      "expect": {
+        "operator": "regex",
+        "value": "transport input ssh"
+      },
+      "rationale": "Telnet transmits authentication credentials and configuration in cleartext across the network. Enforcing SSHv2 protects administrative sessions.",
+      "remediation": "configure terminal\nline vty 0 15\ntransport input ssh\nend"
+    },
+    {
+      "id": "CISCO-SW-1.2",
+      "title": "Ensure HTTP server is disabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "command",
+      "command": "show running-config | include ^ip http server",
+      "expect": {
+        "operator": "regex",
+        "value": "no ip http server|^$"
+      },
+      "rationale": "Cleartext HTTP server daemon presents an unencrypted management vector susceptible to credential interception.",
+      "remediation": "configure terminal\nno ip http server\nend"
+    },
+    {
+      "id": "CISCO-SW-1.3",
+      "title": "Ensure SSH version 2 is enforced",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "command",
+      "command": "show running-config | include ^ip ssh version",
+      "expect": {
+        "operator": "contains",
+        "value": "ip ssh version 2"
+      },
+      "rationale": "SSH version 1 contains fundamental cryptographic flaws. Enforce SSHv2 for all remote administration.",
+      "remediation": "configure terminal\nip ssh version 2\nend"
+    },
+    {
+      "id": "CISCO-SW-1.4",
+      "title": "Ensure VTY exec-timeout is configured between 1 and 15 minutes",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "command",
+      "command": "show running-config | section line vty",
+      "expect": {
+        "operator": "regex",
+        "value": "exec-timeout (0?[1-9]|1[0-5])"
+      },
+      "rationale": "Unattended administrative sessions must terminate automatically after a short period of inactivity to prevent physical/remote session hijacking.",
+      "remediation": "configure terminal\nline vty 0 15\nexec-timeout 10 0\nend"
+    },
+    {
+      "id": "CISCO-SW-1.5",
+      "title": "Ensure Enable Secret uses secure hashing algorithm (Type 8 or Type 9)",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane",
+      "type": "command",
+      "command": "show running-config | include ^enable secret",
+      "expect": {
+        "operator": "regex",
+        "value": "enable secret (8|9)"
+      },
+      "rationale": "Legacy enable secret Type 5 hashes (MD5) can be reversed via rainbow tables. Type 8 (PBKDF2) or Type 9 (scrypt) must be enforced.",
+      "remediation": "configure terminal\nenable algorithm-type scrypt secret <password>\nend"
+    },
+    {
+      "id": "CISCO-SW-2.1",
+      "title": "Ensure default VLAN 1 is not used for trunk native traffic",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Switch & VLAN Hardening",
+      "type": "command",
+      "command": "show running-config | include native vlan",
+      "expect": {
+        "operator": "regex",
+        "value": "switchport trunk native vlan (?!1\\b)\\d+"
+      },
+      "rationale": "Using VLAN 1 as the native trunk VLAN exposes the switch to double-tagging and 802.1Q VLAN hopping attacks. Assign a dedicated, unused non-default VLAN ID.",
+      "remediation": "configure terminal\ninterface <trunk-interface>\nswitchport trunk native vlan 999\nend"
+    },
+    {
+      "id": "CISCO-SW-2.2",
+      "title": "Ensure Port Security is enabled on access switchports",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Switch & VLAN Hardening",
+      "type": "command",
+      "command": "show port-security | include SecurePort",
+      "expect": {
+        "operator": "regex",
+        "value": "\\d+"
+      },
+      "rationale": "Port Security enforces MAC address limits on edge access ports, preventing CAM table overflow (MAC flooding) attacks.",
+      "remediation": "configure terminal\ninterface <interface>\nswitchport mode access\nswitchport port-security\nswitchport port-security maximum 2\nswitchport port-security violation restrict\nend"
+    },
+    {
+      "id": "CISCO-SW-2.3",
+      "title": "Ensure DHCP Snooping is globally enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Switch & VLAN Hardening",
+      "type": "command",
+      "command": "show ip dhcp snooping | include DHCP snooping is",
+      "expect": {
+        "operator": "contains",
+        "value": "DHCP snooping is enabled"
+      },
+      "rationale": "DHCP Snooping drops unauthorized DHCP server offers on untrusted access ports, preventing rogue DHCP man-in-the-middle attacks.",
+      "remediation": "configure terminal\nip dhcp snooping\nip dhcp snooping vlan 1-4094\nend"
+    },
+    {
+      "id": "CISCO-SW-2.4",
+      "title": "Ensure Dynamic ARP Inspection (DAI) is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Switch & VLAN Hardening",
+      "type": "command",
+      "command": "show ip arp inspection vlan | include Vlan",
+      "expect": {
+        "operator": "regex",
+        "value": "Vlan\\s+\\d+"
+      },
+      "rationale": "Dynamic ARP Inspection uses the DHCP snooping database to validate ARP responses, preventing ARP cache poisoning.",
+      "remediation": "configure terminal\nip arp inspection vlan <vlan-id>\nend"
+    },
+    {
+      "id": "CISCO-SW-2.5",
+      "title": "Ensure Spanning Tree BPDU Guard is enabled globally on access ports",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Switch & VLAN Hardening",
+      "type": "command",
+      "command": "show running-config | include spanning-tree portfast bpduguard",
+      "expect": {
+        "operator": "contains",
+        "value": "spanning-tree portfast bpduguard default"
+      },
+      "rationale": "BPDU Guard protects STP topology stability by disabling any edge port that unexpectedly receives Spanning Tree BPDUs.",
+      "remediation": "configure terminal\nspanning-tree portfast bpduguard default\nend"
+    },
+    {
+      "id": "CISCO-SW-2.6",
+      "title": "Ensure unused switchports are administratively disabled",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Switch & VLAN Hardening",
+      "type": "command",
+      "command": "show interfaces status | include down",
+      "expect": {
+        "operator": "contains",
+        "value": "disabled"
+      },
+      "rationale": "Unused physical switchports must be administratively shut down and assigned to an isolated unrouted parking VLAN to block unauthorized rogue physical connections.",
+      "remediation": "configure terminal\ninterface range <unused-interfaces>\nshutdown\nswitchport access vlan 999\nend"
+    },
+    {
+      "id": "CISCO-SW-3.1",
+      "title": "Ensure VTY lines enforce management access-class ACL",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Access Control Lists",
+      "type": "command",
+      "command": "show running-config | section line vty",
+      "expect": {
+        "operator": "regex",
+        "value": "access-class \\S+ in"
+      },
+      "rationale": "Source-IP filtering via access-class restricts VTY management sessions to authorized administration workstations and jumpboxes only.",
+      "remediation": "configure terminal\nip access-list standard MGMT-HOSTS\npermit 10.0.0.0 0.255.255.255\nline vty 0 15\naccess-class MGMT-HOSTS in\nend"
+    },
+    {
+      "id": "CISCO-SW-3.2",
+      "title": "Detect overly permissive ACL rules (permit ip any any)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Access Control Lists",
+      "type": "command",
+      "command": "show ip access-lists | include permit ip any any",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Overly broad permit ip any any rules nullify network access control and allow unrestricted lateral movement.",
+      "remediation": "Remove blanket any-any statements and replace with specific IP source, destination, and port restrictions."
+    },
+    {
+      "id": "CISCO-SW-4.1",
+      "title": "Ensure remote Syslog server is configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show running-config | include ^logging host",
+      "expect": {
+        "operator": "regex",
+        "value": "logging host \\d+\\.\\d+\\.\\d+\\.\\d+"
+      },
+      "rationale": "Local buffer logs are easily cleared upon power-cycle or evasion. System security logs must be shipped to a centralized SIEM.",
+      "remediation": "configure terminal\nlogging host <syslog-server-ip>\nlogging trap informational\nend"
+    },
+    {
+      "id": "CISCO-SW-4.2",
+      "title": "Ensure NTP time synchronization is configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show running-config | include ^ntp server",
+      "expect": {
+        "operator": "regex",
+        "value": "ntp server \\d+\\.\\d+\\.\\d+\\.\\d+"
+      },
+      "rationale": "Accurate system time is essential for forensic log timestamp correlation across disparate network elements.",
+      "remediation": "configure terminal\nntp server <ntp-server-ip>\nend"
+    },
+    {
+      "id": "CISCO-SW-4.3",
+      "title": "Ensure default SNMP community strings (public/private) are removed",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show running-config | include snmp-server community (public|private)",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Default community strings public and private allow unauthorized attackers to query or modify device configuration over SNMP.",
+      "remediation": "configure terminal\nno snmp-server community public\nno snmp-server community private\nend"
+    }
+  ]
+}
+

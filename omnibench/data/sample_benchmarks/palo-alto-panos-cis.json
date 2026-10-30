@@ -1,0 +1,160 @@
+{
+  "benchmark": {
+    "title": "CIS Palo Alto Networks PAN-OS 10.x/11.x Benchmark",
+    "version": "1.0",
+    "platform": "palo-alto-panos"
+  },
+  "checks": [
+    {
+      "id": "PAN-1.1",
+      "title": "Ensure Telnet and HTTP are disabled on Management Interface Profiles",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show config running | match \"(telnet yes|http yes)\"",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Unencrypted HTTP and Telnet protocols expose administrator sessions and API keys to interception and credential harvesting.",
+      "remediation": "set network profiles interface-management-profile <profile-name> telnet no http no"
+    },
+    {
+      "id": "PAN-1.2",
+      "title": "Ensure idle administrator timeout is set to 15 minutes or fewer",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show config running | match \"idle-timeout\"",
+      "expect": {
+        "operator": "regex",
+        "value": "idle-timeout (0?[1-9]|1[0-5])\\b"
+      },
+      "rationale": "Automated session termination mitigates the risk of unauthorized administrators or attackers utilizing abandoned workstations.",
+      "remediation": "set deviceconfig setting management idle-timeout 15"
+    },
+    {
+      "id": "PAN-1.3",
+      "title": "Ensure permitted IP addresses are restricted for management interface access",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show config running | match \"permitted-ip\"",
+      "expect": {
+        "operator": "regex",
+        "value": "permitted-ip"
+      },
+      "rationale": "Restricting permitted IP ranges ensures management daemon endpoints are inaccessible from unauthorized subnets and rogue clients.",
+      "remediation": "set deviceconfig system permitted-ip [ <mgmt-subnet-1> <mgmt-subnet-2> ]"
+    },
+    {
+      "id": "PAN-2.1",
+      "title": "Detect overly permissive security rules (from any to any service any allow)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Security Policy Hardening",
+      "type": "command",
+      "command": "show running security-policy | match \"from any to any .* service any .* action allow\"",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Permitting all sources to all destinations without specific application profiles defeats Next-Generation Firewall inspection.",
+      "remediation": "Replace blanket any-any rules with zero-trust source zones, destination address objects, and strict App-ID specifications."
+    },
+    {
+      "id": "PAN-2.2",
+      "title": "Detect unrestricted inbound access to sensitive ports (SSH 22, RDP 3389, SMB 445)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Security Policy Hardening",
+      "type": "command",
+      "command": "show running security-policy | match \"(ms-rdp|ssh|ms-ds-smb)\"",
+      "expect": {
+        "operator": "not_contains",
+        "value": "from untrust to any"
+      },
+      "rationale": "Exposing administrative or protocol-level sharing ports to untrusted public networks exposes the perimeter to credential brute force and exploits.",
+      "remediation": "Delete untrusted inbound rules for management services and require GlobalProtect VPN tunnel verification."
+    },
+    {
+      "id": "PAN-2.3",
+      "title": "Ensure default-deny interzone and intrazone drop rules log at session end",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Security Policy Hardening",
+      "type": "command",
+      "command": "show config running | match \"(interzone-default|intrazone-default).*log-end\"",
+      "expect": {
+        "operator": "contains",
+        "value": "log-end yes"
+      },
+      "rationale": "By default, PAN-OS does not log dropped packets on the implicit interzone-default rule. Logging at session end is required for threat visibility.",
+      "remediation": "set rulebase default-security-rules rules interzone-default log-end yes"
+    },
+    {
+      "id": "PAN-2.4",
+      "title": "Ensure security rules enforce application-default service port mappings",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Security Policy Hardening",
+      "type": "command",
+      "command": "show running security-policy | match \"service application-default\"",
+      "expect": {
+        "operator": "regex",
+        "value": "application-default"
+      },
+      "rationale": "Using application-default prevents evasion techniques where malware runs protocols over non-standard open ports.",
+      "remediation": "Edit security policy rules and set Service to application-default."
+    },
+    {
+      "id": "PAN-3.1",
+      "title": "Ensure remote Syslog server forwarding profile is configured",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show config running | match \"log-settings syslog\"",
+      "expect": {
+        "operator": "regex",
+        "value": "log-settings syslog"
+      },
+      "rationale": "Forwarding traffic, threat, and system logs to a centralized SIEM guarantees retention compliance and correlation across firewalls.",
+      "remediation": "set shared log-settings syslog <profile-name> server <server-name> server <syslog-ip>"
+    },
+    {
+      "id": "PAN-3.2",
+      "title": "Ensure NTP time synchronization servers are configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show config running | match \"ntp-servers\"",
+      "expect": {
+        "operator": "regex",
+        "value": "ntp-servers"
+      },
+      "rationale": "Clock drift disrupts certificate expiration checks, App-ID cloud updates, and incident log sequencing.",
+      "remediation": "set deviceconfig system ntp-servers primary-ntp-server <primary-ip> secondary-ntp-server <secondary-ip>"
+    },
+    {
+      "id": "PAN-3.3",
+      "title": "Ensure cleartext SNMPv1/v2c default community strings are removed",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show config running | match \"(snmp-community.*public|snmp-community.*private)\"",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "SNMPv1/v2c sends community strings in cleartext and public/private defaults allow unauthorized state queries. SNMPv3 with authPriv is required.",
+      "remediation": "delete deviceconfig system snmp-setting snmp-community <community-name>"
+    }
+  ]
+}
+

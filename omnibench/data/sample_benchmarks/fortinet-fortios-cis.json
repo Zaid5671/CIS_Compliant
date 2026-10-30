@@ -1,0 +1,175 @@
+{
+  "benchmark": {
+    "title": "CIS Fortinet FortiOS 7.x Firewall Benchmark",
+    "version": "1.0",
+    "platform": "fortinet-fortios"
+  },
+  "checks": [
+    {
+      "id": "FGT-1.1",
+      "title": "Ensure Telnet administrative access is disabled on all interfaces",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show system interface | grep -i telnet",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Telnet communicates all administrative traffic in cleartext, including credentials and firewall configuration. Only SSH and HTTPS should be allowed.",
+      "remediation": "config system interface\nedit <interface>\nunset allowaccess telnet\nnext\nend"
+    },
+    {
+      "id": "FGT-1.2",
+      "title": "Ensure unencrypted HTTP administrative access is disabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show system interface | grep -E \"set allowaccess.*\\bhttp\\b\"",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Cleartext HTTP management exposes session tokens and administrator credentials to network eavesdropping. HTTPS must be strictly enforced.",
+      "remediation": "config system interface\nedit <interface>\nunset allowaccess http\nnext\nend"
+    },
+    {
+      "id": "FGT-1.3",
+      "title": "Ensure idle administrator timeout is configured to 10 minutes or fewer",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show system global | grep admintimeout",
+      "expect": {
+        "operator": "regex",
+        "value": "set admintimeout (0?[1-9]|10)\\b"
+      },
+      "rationale": "Unattended administrative sessions increase the exposure window for unauthorized modification. Enforce a 10-minute maximum idle timeout.",
+      "remediation": "config system global\nset admintimeout 10\nend"
+    },
+    {
+      "id": "FGT-1.4",
+      "title": "Ensure pre-login warning banner is enabled",
+      "severity": "low",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show system global | grep pre-login-banner",
+      "expect": {
+        "operator": "contains",
+        "value": "set pre-login-banner enable"
+      },
+      "rationale": "A legal notification banner establishes legal notice that access is monitored and unauthorized access is prohibited.",
+      "remediation": "config system global\nset pre-login-banner enable\nend"
+    },
+    {
+      "id": "FGT-2.1",
+      "title": "Detect overly permissive firewall policies (permit any-any)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Firewall Policies & ACLs",
+      "type": "command",
+      "command": "show firewall policy | grep -B 2 -A 8 'set action accept' | grep -E 'set srcaddr \"all\"' | grep -E 'set dstaddr \"all\"' | grep -E 'set service \"ALL\"'",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Firewall rules permitting all sources to all destinations across all services defeat network segmentation and violate the principle of least privilege.",
+      "remediation": "Audit firewall policies and replace blanket any-any rules with explicit source, destination, and application service definitions."
+    },
+    {
+      "id": "FGT-2.2",
+      "title": "Detect unrestricted inbound access (0.0.0.0/0) on sensitive ports (SSH 22, RDP 3389, SMB 445)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Firewall Policies & ACLs",
+      "type": "command",
+      "command": "show firewall policy | grep -E '(SSH|RDP|SAMBA|SMB)'",
+      "expect": {
+        "operator": "not_contains",
+        "value": "set srcaddr \"all\""
+      },
+      "rationale": "Direct internet exposure of management ports (SSH/RDP) or lateral movement protocols (SMB 445) is a primary initial access vector for ransomware.",
+      "remediation": "Restrict inbound management ports to dedicated corporate IP ranges, or require SSL-VPN / IPsec gateway authentication before access."
+    },
+    {
+      "id": "FGT-2.3",
+      "title": "Ensure default-deny implicit policy logs all denied traffic",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Firewall Policies & ACLs",
+      "type": "command",
+      "command": "show firewall policy 0 | grep logtraffic",
+      "expect": {
+        "operator": "contains",
+        "value": "set logtraffic all"
+      },
+      "rationale": "Logging dropped connection attempts on policy 0 is essential for detecting port scans, reconnaissance, and malicious traffic surges.",
+      "remediation": "config firewall policy\nedit 0\nset logtraffic all\nnext\nend"
+    },
+    {
+      "id": "FGT-2.4",
+      "title": "Ensure IPS deep-packet inspection sensor is applied to exposed traffic policies",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Firewall Policies & ACLs",
+      "type": "command",
+      "command": "show firewall policy | grep 'set ips-sensor'",
+      "expect": {
+        "operator": "regex",
+        "value": "set ips-sensor"
+      },
+      "rationale": "Intrusion Prevention System (IPS) inspection signatures detect exploit attempts, protocol anomalies, and vulnerability scans passing through the firewall.",
+      "remediation": "config firewall policy\nedit <policy-id>\nset utm-status enable\nset ips-sensor \"default\"\nnext\nend"
+    },
+    {
+      "id": "FGT-3.1",
+      "title": "Ensure remote Syslog server forwarding is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show log syslogd setting | grep status",
+      "expect": {
+        "operator": "contains",
+        "value": "set status enable"
+      },
+      "rationale": "Security and network audit logs must be shipped in near real-time to an immutable, centralized SIEM repository for compliance and detection.",
+      "remediation": "config log syslogd setting\nset status enable\nset server \"<syslog-ip>\"\nset mode udp\nend"
+    },
+    {
+      "id": "FGT-3.2",
+      "title": "Ensure NTP time synchronization is configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show system ntp | grep type",
+      "expect": {
+        "operator": "regex",
+        "value": "set type (FortiGuard|custom)"
+      },
+      "rationale": "Reliable NTP synchronization ensures timestamps match across firewalls, authentication servers, and SIEM correlators.",
+      "remediation": "config system ntp\nset status enable\nset type FortiGuard\nend"
+    },
+    {
+      "id": "FGT-3.3",
+      "title": "Ensure default SNMP community strings (public/private) are removed",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show system snmp community | grep -E 'name \"(public|private)\"'",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Known default community strings allow external attackers or compromised local machines to discover network topology and firewall state.",
+      "remediation": "config system snmp community\ndelete <community-id-for-public>\nend"
+    }
+  ]
+}
+

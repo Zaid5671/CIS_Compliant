@@ -366,6 +366,50 @@ BENCHMARK_CATALOG: list[dict[str, Any]] = [
         "profile": "Level 1",
         "recommended": False,
     },
+    {
+        "name": "cisco-catalyst-switch-cis",
+        "title": "Cisco Catalyst Switch",
+        "platform": "Cisco Catalyst",
+        "os_family": "network",
+        "category": "Network",
+        "tags": ["cisco", "catalyst", "switch", "network", "cis", "ssh"],
+        "description": "Cisco switch hardening: VLAN 1 segregation, Port Security, DHCP Snooping, Dynamic ARP Inspection, BPDU Guard, unused ports shutdown.",
+        "profile": "Level 1",
+        "recommended": True,
+    },
+    {
+        "name": "fortinet-fortios-cis",
+        "title": "Fortinet FortiOS Firewall",
+        "platform": "Fortinet FortiOS",
+        "os_family": "firewall",
+        "category": "Firewall",
+        "tags": ["fortinet", "fortios", "firewall", "cis", "ssh"],
+        "description": "FortiGate firewall hardening: management plane, any-any policy detection, 0.0.0.0/0 exposure, implicit deny logging, Syslog, NTP.",
+        "profile": "Level 1",
+        "recommended": True,
+    },
+    {
+        "name": "palo-alto-panos-cis",
+        "title": "Palo Alto PAN-OS Firewall",
+        "platform": "Palo Alto PAN-OS",
+        "os_family": "firewall",
+        "category": "Firewall",
+        "tags": ["paloalto", "panos", "firewall", "cis", "ssh"],
+        "description": "Palo Alto Next-Gen Firewall baseline: management profiles, idle timeouts, App-ID enforcement, interzone default drop logging, Syslog.",
+        "profile": "Level 1",
+        "recommended": True,
+    },
+    {
+        "name": "cisco-asa-firewall-cis",
+        "title": "Cisco ASA Firewall",
+        "platform": "Cisco ASA",
+        "os_family": "firewall",
+        "category": "Firewall",
+        "tags": ["cisco", "asa", "firewall", "cis", "ssh"],
+        "description": "Cisco ASA firewall audit: disabling Telnet, restricted ASDM access, any-any ACL detection, MPF inspection, remote Syslog, NTP.",
+        "profile": "Level 1",
+        "recommended": False,
+    },
 ]
 
 
@@ -403,9 +447,10 @@ class CatalogCache:
             return data
 
 
-def _preview(checks) -> list[dict[str, Any]]:
+def _preview(checks, limit: int | None = None) -> list[dict[str, Any]]:
     items = []
-    for check in checks[:5]:
+    subset = checks[:limit] if limit is not None else checks
+    for check in subset:
         items.append({
             "id": check.id,
             "title": check.title,

@@ -1,0 +1,175 @@
+{
+  "benchmark": {
+    "title": "CIS Cisco ASA Firewall Benchmark",
+    "version": "1.0",
+    "platform": "cisco-asa"
+  },
+  "checks": [
+    {
+      "id": "ASA-1.1",
+      "title": "Ensure Telnet access is disabled on all firewall interfaces",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show running-config | include ^telnet",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Cleartext Telnet exposes administrator login passwords and security appliance configuration across transit links.",
+      "remediation": "no telnet 0.0.0.0 0.0.0.0 <interface-name>"
+    },
+    {
+      "id": "ASA-1.2",
+      "title": "Ensure HTTP ASDM server access is restricted to authorized subnets",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show running-config | include ^http ",
+      "expect": {
+        "operator": "not_contains",
+        "value": "http 0.0.0.0 0.0.0.0"
+      },
+      "rationale": "Enabling ASDM HTTP management access without source IP restrictions exposes the administrative web interface to unauthorized hosts.",
+      "remediation": "no http 0.0.0.0 0.0.0.0 inside\nhttp <management-subnet-ip> <subnet-mask> inside"
+    },
+    {
+      "id": "ASA-1.3",
+      "title": "Ensure SSH version 2 is enforced",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show running-config | include ^ssh version",
+      "expect": {
+        "operator": "contains",
+        "value": "ssh version 2"
+      },
+      "rationale": "Legacy SSH version 1 contains known protocol vulnerabilities. Only SSHv2 must be permitted on the ASA management plane.",
+      "remediation": "ssh version 2"
+    },
+    {
+      "id": "ASA-1.4",
+      "title": "Ensure SSH timeout interval is configured to 10 minutes or fewer",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Management Plane Security",
+      "type": "command",
+      "command": "show running-config | include ^ssh timeout",
+      "expect": {
+        "operator": "regex",
+        "value": "ssh timeout (0?[1-9]|10)\\b"
+      },
+      "rationale": "Inactive SSH management sessions should automatically disconnect to prevent unauthorized administrative use of unattended terminals.",
+      "remediation": "ssh timeout 10"
+    },
+    {
+      "id": "ASA-2.1",
+      "title": "Detect overly permissive access-lists (permit ip any any)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Access Control Lists (ACLs)",
+      "type": "command",
+      "command": "show running-config | include access-list .* permit ip any any",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Permit ip any any access control entries disable stateful filtering and allow uncontrolled transit traffic across security boundaries.",
+      "remediation": "Remove broad any-any permit rules and implement granular destination IP, object-group, and port restrictions."
+    },
+    {
+      "id": "ASA-2.2",
+      "title": "Detect unrestricted outside ingress to sensitive ports (SSH 22, RDP 3389, SMB 445)",
+      "severity": "critical",
+      "profile": "Level 1",
+      "category": "Access Control Lists (ACLs)",
+      "type": "command",
+      "command": "show running-config | include access-list outside_in permit .* (eq 22|eq 3389|eq 445)",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Direct inbound public exposure of SSH, Remote Desktop Protocol, or SMB allows adversaries to perform credential brute-forcing and exploit remote flaws.",
+      "remediation": "Remove inbound access-list entries opening ports 22, 3389, and 445 on external interfaces; require AnyConnect / IPsec VPN."
+    },
+    {
+      "id": "ASA-2.3",
+      "title": "Ensure implicit deny traffic is logged on perimeter access-lists",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Access Control Lists (ACLs)",
+      "type": "command",
+      "command": "show running-config | include access-list .* deny ip any any log",
+      "expect": {
+        "operator": "regex",
+        "value": "deny ip any any log"
+      },
+      "rationale": "While the ASA drops unmatched packets by default, explicitly configuring 'deny ip any any log' generates syslog alerts for dropped traffic analysis.",
+      "remediation": "access-list <acl-name> extended deny ip any any log default"
+    },
+    {
+      "id": "ASA-2.4",
+      "title": "Ensure stateful application inspection is active in global policy map",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Inspection & Defense",
+      "type": "command",
+      "command": "show running-config | section policy-map global_policy",
+      "expect": {
+        "operator": "regex",
+        "value": "inspect (dns|ftp|icmp)"
+      },
+      "rationale": "Stateful L4-L7 Modular Policy Framework (MPF) inspection validates packet RFC adherence and payload structure for standard services.",
+      "remediation": "policy-map global_policy\nclass inspection_default\ninspect dns\ninspect ftp\ninspect icmp\nexit"
+    },
+    {
+      "id": "ASA-3.1",
+      "title": "Ensure remote Syslog server logging is enabled",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show running-config | include ^logging host",
+      "expect": {
+        "operator": "regex",
+        "value": "logging host \\S+ \\d+\\.\\d+\\.\\d+\\.\\d+"
+      },
+      "rationale": "Centralized logging ensures security violations, connection teardowns, and administrative changes are permanently recorded in a SIEM.",
+      "remediation": "logging enable\nlogging host inside <syslog-ip>\nlogging trap informational"
+    },
+    {
+      "id": "ASA-3.2",
+      "title": "Ensure NTP time synchronization is configured",
+      "severity": "medium",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show running-config | include ^ntp server",
+      "expect": {
+        "operator": "regex",
+        "value": "ntp server \\d+\\.\\d+\\.\\d+\\.\\d+"
+      },
+      "rationale": "Accurate timestamps are required for digital evidence, certificate validity checks, and synchronized threat intelligence.",
+      "remediation": "ntp server <ntp-server-ip> source inside"
+    },
+    {
+      "id": "ASA-3.3",
+      "title": "Ensure default SNMP community strings (public/private) are removed",
+      "severity": "high",
+      "profile": "Level 1",
+      "category": "Logging & Telemetry",
+      "type": "command",
+      "command": "show running-config | include snmp-server community (public|private)",
+      "expect": {
+        "operator": "regex",
+        "value": "^$"
+      },
+      "rationale": "Default community strings public and private allow unauthorized users to query network interface states and router metrics.",
+      "remediation": "no snmp-server community public\nno snmp-server community private"
+    }
+  ]
+}
+
