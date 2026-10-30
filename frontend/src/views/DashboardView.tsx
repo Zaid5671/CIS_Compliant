@@ -91,7 +91,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       failed: categoryScores.linux?.failed ?? 0,
       status: categoryScores.linux?.count ? `${categoryScores.linux.count} Server${categoryScores.linux.count > 1 ? 's' : ''}` : 'SSH Remote',
       badgeColor: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-      sampleBenchmark: 'linux-basic',
+      sampleBenchmark: 'ubuntu-22-04-cis-starter',
     },
     {
       id: 'firewall',
@@ -102,9 +102,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       count: categoryScores.firewall?.count ?? 0,
       passed: categoryScores.firewall?.passed ?? 0,
       failed: categoryScores.firewall?.failed ?? 0,
-      status: categoryScores.firewall?.count ? `${categoryScores.firewall.count} Appliance${categoryScores.firewall.count > 1 ? 's' : ''}` : 'Config Ingest',
+      status: categoryScores.firewall?.count ? `${categoryScores.firewall.count} Appliance${categoryScores.firewall.count > 1 ? 's' : ''}` : 'Fortinet / PA / ASA',
       badgeColor: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
-      sampleBenchmark: 'network-device-ssh-starter',
+      sampleBenchmark: 'fortinet-fortios-cis',
     },
     {
       id: 'network',
@@ -115,9 +115,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       count: categoryScores.network?.count ?? 0,
       passed: categoryScores.network?.passed ?? 0,
       failed: categoryScores.network?.failed ?? 0,
-      status: categoryScores.network?.count ? `${categoryScores.network.count} Switch${categoryScores.network.count > 1 ? 'es' : ''}` : 'Show Run / SSH',
+      status: categoryScores.network?.count ? `${categoryScores.network.count} Switch${categoryScores.network.count > 1 ? 'es' : ''}` : 'Catalyst / IOS XE',
       badgeColor: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
-      sampleBenchmark: 'network-device-ssh-starter',
+      sampleBenchmark: 'cisco-catalyst-switch-cis',
     },
   ];
 

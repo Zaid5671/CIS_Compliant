@@ -102,29 +102,76 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
 
   const downloadRemediationPlaybook = () => {
     const failedChecks = report.results.filter(r => (r.status === 'FAIL' || r.status === 'WARN') && r.remediation);
-    const isWindows = report.benchmark.title.toLowerCase().includes('windows');
+    const title = report.benchmark.title.toLowerCase();
+    const isWindows = title.includes('windows');
+    const isCisco = title.includes('cisco') || title.includes('catalyst') || title.includes('ios') || title.includes('asa');
+    const isFortinet = title.includes('fortinet') || title.includes('fortios');
+    const isPaloAlto = title.includes('palo alto') || title.includes('pan-os');
     
     let scriptContent = '';
     let filename = '';
 
-    if (isWindows) {
+    if (isCisco) {
+      filename = 'cisguard-remediation-cisco.ios';
+      scriptContent = [
+        '! ==========================================================================',
+        '! CISGuard Automated Hardening Configuration (Cisco CLI Playbook)',
+        `! Benchmark: ${report.benchmark.title}`,
+        `! Generated: ${new Date().toISOString()}`,
+        '! Paste into "configure terminal" session on the Cisco appliance:',
+        '! ==========================================================================\n',
+        'configure terminal',
+        ...failedChecks.map(c => `! --- [${c.check_id}] ${c.title} ---\n${c.remediation}\n`),
+        'end',
+        'write memory\n',
+      ].join('\n');
+    } else if (isFortinet) {
+      filename = 'cisguard-remediation-fortigate.conf';
+      scriptContent = [
+        '# ==========================================================================',
+        '# CISGuard Automated Hardening Script (Fortinet FortiOS CLI)',
+        `# Benchmark: ${report.benchmark.title}`,
+        `# Generated: ${new Date().toISOString()}`,
+        '# Paste directly into FortiGate SSH CLI:',
+        '# ==========================================================================\n',
+        ...failedChecks.map(c => `# --- [${c.check_id}] ${c.title} ---\n${c.remediation}\n`),
+      ].join('\n');
+    } else if (isPaloAlto) {
+      filename = 'cisguard-remediation-panos.set';
+      scriptContent = [
+        '# ==========================================================================',
+        '# CISGuard Automated Hardening Script (Palo Alto PAN-OS CLI)',
+        `# Benchmark: ${report.benchmark.title}`,
+        `# Generated: ${new Date().toISOString()}`,
+        '# Paste in PAN-OS CLI configuration mode:',
+        '# ==========================================================================\n',
+        'set cli scripting-mode on',
+        'configure',
+        ...failedChecks.map(c => `# --- [${c.check_id}] ${c.title} ---\n${c.remediation}\n`),
+        'commit',
+      ].join('\n');
+    } else if (isWindows) {
       filename = 'cisguard-remediation.ps1';
       scriptContent = [
+        '# ==========================================================================',
         '# CISGuard Automated Remediation Playbook (PowerShell)',
         `# Benchmark: ${report.benchmark.title}`,
         `# Generated: ${new Date().toISOString()}`,
-        '# DISCLAIMER: Review each command before executing in production.\n',
-        ...failedChecks.map(c => `Write-Host "Applying fix for: [${c.check_id}] ${c.title}" -ForegroundColor Cyan\n# Rationale: ${c.rationale}\n# Remediation: ${c.remediation}\n`),
+        '# DISCLAIMER: Review each command before executing in production.',
+        '# ==========================================================================\n',
+        ...failedChecks.map(c => `Write-Host "Applying fix for: [${c.check_id}] ${c.title}" -ForegroundColor Cyan\n# Rationale: ${c.rationale}\n${c.remediation}\n`),
       ].join('\n');
     } else {
       filename = 'cisguard-remediation.sh';
       scriptContent = [
         '#!/usr/bin/env bash',
+        '# ==========================================================================',
         '# CISGuard Automated Remediation Playbook (Bash)',
         `# Benchmark: ${report.benchmark.title}`,
         `# Generated: ${new Date().toISOString()}`,
-        '# DISCLAIMER: Review each command before executing in production.\nset -e\n',
-        ...failedChecks.map(c => `echo "Applying fix for: [${c.check_id}] ${c.title}"\n# Rationale: ${c.rationale}\n# Remediation: ${c.remediation}\n`),
+        '# DISCLAIMER: Review each command before executing in production.',
+        '# ==========================================================================\nset -e\n',
+        ...failedChecks.map(c => `echo "Applying fix for: [${c.check_id}] ${c.title}"\n# Rationale: ${c.rationale}\n${c.remediation}\n`),
       ].join('\n');
     }
 

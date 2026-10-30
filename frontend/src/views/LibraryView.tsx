@@ -29,7 +29,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [previewItem, setPreviewItem] = useState<any | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
-  const categories = ['All', 'Endpoint', 'Server', 'Network', 'Cloud', 'Container', 'Database', 'Virtualization'];
+  const categories = ['All', 'Endpoint', 'Server', 'Firewall', 'Network', 'Cloud', 'Container', 'Database', 'Virtualization'];
 
   const filtered = library.filter((item) => {
     if (activeCategory !== 'All' && item.category?.toLowerCase() !== activeCategory.toLowerCase()) {
@@ -162,14 +162,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-3 flex-1 text-xs">
-              <h4 className="font-semibold text-zinc-300 uppercase tracking-wider text-[11px]">Included Benchmark Rules ({previewItem.checks} checks)</h4>
-              <div className="space-y-2">
+            <div className="p-6 overflow-y-auto space-y-3 flex-1 text-xs max-h-[55vh]">
+              <div className="flex items-center justify-between pb-1 border-b border-zinc-800/60">
+                <h4 className="font-semibold text-zinc-300 uppercase tracking-wider text-[11px]">
+                  Included Benchmark Rules ({previewItem.checks} checks)
+                </h4>
+              </div>
+              <div className="space-y-2 pt-1">
                 {(previewItem.details?.preview || []).map((check: any) => (
-                  <div key={check.id} className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70 flex items-center justify-between gap-3">
-                    <div>
-                      <span className="font-mono text-[11px] text-purple-400 font-semibold">{check.id}</span>
-                      <p className="font-medium text-zinc-200 mt-0.5">{check.title}</p>
+                  <div key={check.id} className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70 flex items-center justify-between gap-3 hover:border-zinc-700 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] text-purple-400 font-semibold">{check.id}</span>
+                        {check.category && (
+                          <span className="text-[10px] text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/50">
+                            {check.category}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-medium text-zinc-200 mt-1 leading-snug">{check.title}</p>
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 shrink-0">
                       {check.severity}
